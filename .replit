@@ -7,4 +7,20 @@ channel = "stable-22_11"
 
 [deployment]
 run = ["sh", "-c", "cd src/frontend && python main.py"]
-deploymentTarget = "cloudrun" 
+deploymentTarget = "cloudrun"
+
+[packager]
+language = "python3"
+ignoredPackages = ["unit_tests"]
+
+[packager.features]
+enabledForHosting = true
+packageSearch = true
+guessImports = true
+
+[languages.python3]
+pattern = "**/*.py"
+syntax = "python"
+
+[languages.python3.languageServer]
+start = "pylsp" 

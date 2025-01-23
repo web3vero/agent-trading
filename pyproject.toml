@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "moon-dev-rbi-agent"
+version = "0.1.0"
+description = "Moon Dev's RBI Agent for Trading"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "0.95.2"
+uvicorn = "0.21.1"
+python-multipart = "0.0.6"
+jinja2 = "3.1.2"
+python-dotenv = "^1.0.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api" 
