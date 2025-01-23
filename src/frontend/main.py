@@ -76,19 +76,33 @@ async def process_strategy_background(links: list):
             try:
                 # Clear old files
                 print("🧹 Clearing old files...")
-                strategy_dir = Path("data/rbi/research")
-                backtest_dir = Path("data/rbi/backtests_final")
+                strategy_dir = PROJECT_ROOT / "data/rbi/research"
+                backtest_dir = PROJECT_ROOT / "data/rbi/backtests_final"
+                
+                # Create directories if they don't exist
+                strategy_dir.mkdir(parents=True, exist_ok=True)
+                backtest_dir.mkdir(parents=True, exist_ok=True)
                 
                 # Process the strategy
                 process_trading_idea(link)
+                
+                print("🔍 Looking for output files...")
+                print(f"Strategy dir: {strategy_dir}")
+                print(f"Backtest dir: {backtest_dir}")
                 
                 # Get the most recent strategy and backtest files
                 strategy_files = list(strategy_dir.glob("*.txt"))
                 backtest_files = list(backtest_dir.glob("*.py"))
                 
+                print(f"Found {len(strategy_files)} strategy files")
+                print(f"Found {len(backtest_files)} backtest files")
+                
                 if strategy_files and backtest_files:
                     strategy_file = max(strategy_files, key=lambda x: x.stat().st_mtime)
                     backtest_file = max(backtest_files, key=lambda x: x.stat().st_mtime)
+                    
+                    print(f"📄 Reading strategy file: {strategy_file}")
+                    print(f"📄 Reading backtest file: {backtest_file}")
                     
                     strategy_content = strategy_file.read_text()
                     backtest_content = backtest_file.read_text()
@@ -109,7 +123,7 @@ async def process_strategy_background(links: list):
                         "strategy_number": i,
                         "link": link,
                         "status": "error",
-                        "message": "Strategy processing completed but output files not found"
+                        "message": f"Strategy processing completed but output files not found. Strategy files: {len(strategy_files)}, Backtest files: {len(backtest_files)}"
                     }
                     processing_results.append(result)
                     print(f"❌ Strategy {i} failed: Output files not found")
