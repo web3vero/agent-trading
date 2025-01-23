@@ -171,123 +171,113 @@ function updateResult(result) {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('analyzeForm');
-    const spinner = document.getElementById('spinner');
-    const results = document.getElementById('results');
+    const submitButton = document.getElementById('submitButton');
     const resultsContent = document.getElementById('resultsContent');
+    const loadingSpinner = document.getElementById('loadingSpinner');
     const processingAnimation = document.getElementById('processingAnimation');
-    const funMessageElement = document.getElementById('funMessage');
-    
-    form.addEventListener('submit', async (e) => {
+    let pollingInterval;
+
+    async function pollForResults() {
+        try {
+            const response = await fetch('/results');
+            const data = await response.json();
+            
+            console.log("🔍 Polling results:", data);
+            
+            if (data.status === 'success') {
+                if (data.results && data.results.length > 0) {
+                    resultsContent.innerHTML = ''; // Clear previous results
+                    
+                    data.results.forEach(result => {
+                        const resultHtml = `
+                            <div class="mb-8 p-4 bg-white rounded-lg shadow-md">
+                                <h3 class="text-lg font-semibold mb-2">Strategy ${result.strategy_number} ${result.status === 'success' ? '✅' : '❌'}</h3>
+                                ${result.status === 'success' ? `
+                                    <div class="mb-4">
+                                        <h4 class="font-medium mb-2">Strategy Analysis 📊</h4>
+                                        <pre class="bg-gray-100 p-4 rounded overflow-x-auto">${result.strategy}</pre>
+                                        <a href="/download/strategy/${result.strategy_file}" class="text-blue-500 hover:text-blue-700">Download Strategy</a>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium mb-2">Backtest Implementation 🔬</h4>
+                                        <pre class="bg-gray-100 p-4 rounded overflow-x-auto">${result.backtest}</pre>
+                                        <a href="/download/backtest/${result.backtest_file}" class="text-blue-500 hover:text-blue-700">Download Backtest</a>
+                                    </div>
+                                ` : `
+                                    <div class="text-red-500">
+                                        Error: ${result.message}
+                                    </div>
+                                `}
+                            </div>
+                        `;
+                        resultsContent.innerHTML += resultHtml;
+                    });
+                }
+                
+                if (data.is_complete) {
+                    console.log("✅ Processing complete!");
+                    clearInterval(pollingInterval);
+                    loadingSpinner.classList.add('hidden');
+                    processingAnimation.classList.add('hidden');
+                }
+            } else {
+                console.error("❌ Error in results:", data);
+                resultsContent.innerHTML = `<div class="text-red-500">Error: ${data.message || 'An unexpected error occurred'}</div>`;
+                clearInterval(pollingInterval);
+                loadingSpinner.classList.add('hidden');
+                processingAnimation.classList.add('hidden');
+            }
+        } catch (error) {
+            console.error("❌ Error polling results:", error);
+            resultsContent.innerHTML = `<div class="text-red-500">Error: ${error.message}</div>`;
+            clearInterval(pollingInterval);
+            loadingSpinner.classList.add('hidden');
+            processingAnimation.classList.add('hidden');
+        }
+    }
+
+    form.addEventListener('submit', async function(e) {
         e.preventDefault();
-        console.log("🌟 Form submitted");
         
-        // Reset UI state
-        document.querySelectorAll('.progress-messages').forEach(el => el.innerHTML = '');
-        document.querySelectorAll('.processing-phase').forEach(el => {
-            el.classList.remove('active', 'phase-complete', 'phase-error');
-        });
-        
-        spinner.classList.remove('hidden');
-        results.classList.add('hidden');
-        processingAnimation.classList.remove('hidden');
+        // Clear previous results and show loading state
         resultsContent.innerHTML = '';
-        
-        const messageInterval = cycleMessages(funMessageElement, funMessages);
+        loadingSpinner.classList.remove('hidden');
+        processingAnimation.classList.remove('hidden');
+        submitButton.disabled = true;
         
         try {
+            console.log("🌙 Submitting form...");
             const formData = new FormData(form);
-            const links = formData.get('links');
-            console.log("🔗 Processing links:", links);
             
-            // Start processing
-            console.log("🚀 Sending request to /analyze endpoint");
             const response = await fetch('/analyze', {
                 method: 'POST',
                 body: formData
             });
             
-            console.log("📡 Received response");
             const data = await response.json();
-            console.log("📦 Response data:", data);
+            console.log("📡 Response:", data);
             
             if (data.status === 'success') {
-                console.log("✅ Analysis started successfully");
-                
-                // Start animations
-                const researchPhase = document.getElementById('researchPhase');
-                const backtestPhase = document.getElementById('backtestPhase');
-                const debugPhase = document.getElementById('debugPhase');
-                
-                await processPhase(researchPhase, researchMessages, PHASE_TIMINGS.research);
-                await processPhase(backtestPhase, backtestMessages, PHASE_TIMINGS.backtest);
-                await processPhase(debugPhase, debugMessages, PHASE_TIMINGS.debug);
-                
-                // Show results section and start polling
-                results.classList.remove('hidden');
-                console.log("🔄 Starting results polling");
-                
-                const pollInterval = setInterval(async () => {
-                    try {
-                        console.log("📊 Polling for results...");
-                        const pollResponse = await fetch('/results');
-                        const pollData = await pollResponse.json();
-                        console.log("📥 Poll data:", pollData);
-                        
-                        if (pollData.status === 'success' && Array.isArray(pollData.results)) {
-                            console.log(`📋 Processing ${pollData.results.length} results`);
-                            pollData.results.forEach(result => {
-                                console.log(`🔍 Processing result for strategy ${result.strategy_number}`);
-                                updateResult(result);
-                            });
-                            
-                            if (pollData.complete) {
-                                console.log("✨ Processing complete!");
-                                clearInterval(pollInterval);
-                                spinner.classList.add('hidden');
-                                processingAnimation.classList.add('hidden');
-                                clearInterval(messageInterval);
-                            }
-                        }
-                    } catch (pollError) {
-                        console.error('❌ Polling error:', pollError);
-                        clearInterval(pollInterval);
-                        
-                        resultsContent.innerHTML = `
-                            <div class="bg-red-900/50 text-red-200 p-6 rounded-lg error-animation">
-                                <h3 class="text-xl font-bold mb-2">❌ Error</h3>
-                                <p>Error retrieving results: ${pollError.message}</p>
-                            </div>
-                        `;
-                    }
-                }, 5000);
+                console.log("✨ Starting polling for results...");
+                // Start polling for results every 5 seconds
+                pollingInterval = setInterval(pollForResults, 5000);
+                // Also poll immediately
+                await pollForResults();
             } else {
-                console.error("❌ Error in response:", data);
-                results.classList.remove('hidden');
-                resultsContent.innerHTML = `
-                    <div class="bg-red-900/50 text-red-200 p-6 rounded-lg error-animation">
-                        <h3 class="text-xl font-bold mb-2">❌ Error</h3>
-                        <p>${data.message || 'An unexpected error occurred in the response format'}</p>
-                    </div>
-                `;
-                spinner.classList.add('hidden');
+                console.error("❌ Error:", data);
+                resultsContent.innerHTML = `<div class="text-red-500">Error: ${data.message || 'An unexpected error occurred'}</div>`;
+                loadingSpinner.classList.add('hidden');
                 processingAnimation.classList.add('hidden');
-                clearInterval(messageInterval);
             }
         } catch (error) {
-            console.error('❌ Error:', error);
-            results.classList.remove('hidden');
-            resultsContent.innerHTML = `
-                <div class="bg-red-900/50 text-red-200 p-6 rounded-lg error-animation">
-                    <h3 class="text-xl font-bold mb-2">❌ Error</h3>
-                    <p>An unexpected error occurred: ${error.message}</p>
-                    <p class="mt-2 text-sm">Please check the console for more details.</p>
-                </div>
-            `;
-            spinner.classList.add('hidden');
+            console.error("❌ Error:", error);
+            resultsContent.innerHTML = `<div class="text-red-500">Error: ${error.message}</div>`;
+            loadingSpinner.classList.add('hidden');
             processingAnimation.classList.add('hidden');
-            clearInterval(messageInterval);
+        } finally {
+            submitButton.disabled = false;
         }
     });
 });

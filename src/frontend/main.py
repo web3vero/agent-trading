@@ -65,94 +65,82 @@ async def process_strategy_background(links: list):
     """Process strategies in the background"""
     global processing_results, is_processing_complete
     
+    # Clear old results
+    processing_results = []
+    is_processing_complete = False
+    
     try:
-        processing_results = []
-        is_processing_complete = False
-        
+        # Process each strategy
         for i, link in enumerate(links, 1):
+            print(f"🌙 Processing Strategy {i}: {link}")
             try:
-                print(f"🌙 Processing Strategy {i}: {link}")
-                
-                # Get the latest strategy and backtest files
-                strategy_dir = PROJECT_ROOT / "data/rbi/research"
-                backtest_dir = PROJECT_ROOT / "data/rbi/backtests_final"
-                
-                # Clear old files to prevent using cached results
+                # Clear old files
                 print("🧹 Clearing old files...")
-                for file in strategy_dir.glob("strategy_*.txt"):
-                    print(f"  🗑️ Removing old strategy file: {file.name}")
-                    file.unlink()
-                for file in backtest_dir.glob("backtest_final_*.py"):
-                    print(f"  🗑️ Removing old backtest file: {file.name}")
-                    file.unlink()
+                strategy_dir = Path("data/rbi/research")
+                backtest_dir = Path("data/rbi/backtests_final")
                 
                 # Process the strategy
                 process_trading_idea(link)
                 
-                # Get the most recent files
-                strategy_files = sorted(strategy_dir.glob("strategy_*.txt"), key=lambda x: x.stat().st_mtime, reverse=True)
-                backtest_files = sorted(backtest_dir.glob("backtest_final_*.py"), key=lambda x: x.stat().st_mtime, reverse=True)
+                # Get the most recent strategy and backtest files
+                strategy_files = list(strategy_dir.glob("*.txt"))
+                backtest_files = list(backtest_dir.glob("*.py"))
                 
                 if strategy_files and backtest_files:
-                    with open(strategy_files[0], 'r') as f:
-                        strategy_content = f.read()
-                    with open(backtest_files[0], 'r') as f:
-                        backtest_content = f.read()
+                    strategy_file = max(strategy_files, key=lambda x: x.stat().st_mtime)
+                    backtest_file = max(backtest_files, key=lambda x: x.stat().st_mtime)
+                    
+                    strategy_content = strategy_file.read_text()
+                    backtest_content = backtest_file.read_text()
                     
                     result = {
                         "strategy_number": i,
                         "link": link,
+                        "status": "success",
                         "strategy": strategy_content,
                         "backtest": backtest_content,
-                        "strategy_file": str(strategy_files[0].name),
-                        "backtest_file": str(backtest_files[0].name),
-                        "status": "success"
+                        "strategy_file": strategy_file.name,
+                        "backtest_file": backtest_file.name
                     }
+                    processing_results.append(result)
+                    print(f"✅ Strategy {i} complete!")
                 else:
                     result = {
                         "strategy_number": i,
                         "link": link,
-                        "error": "Strategy processing completed but couldn't find output files",
-                        "status": "error"
+                        "status": "error",
+                        "message": "Strategy processing completed but output files not found"
                     }
-                
-                processing_results.append(result)
-                
+                    processing_results.append(result)
+                    print(f"❌ Strategy {i} failed: Output files not found")
             except Exception as e:
-                print(f"❌ Error processing strategy {i}: {e}")
-                processing_results.append({
+                result = {
                     "strategy_number": i,
                     "link": link,
-                    "error": f"Error processing strategy: {str(e)}",
-                    "status": "error"
-                })
-        
-        is_processing_complete = True
-        
-    except Exception as e:
-        print(f"❌ Error processing strategies: {e}")
+                    "status": "error",
+                    "message": str(e)
+                }
+                processing_results.append(result)
+                print(f"❌ Strategy {i} failed: {str(e)}")
+    finally:
         is_processing_complete = True
 
 @app.post("/analyze")
 async def analyze_strategy(request: Request, background_tasks: BackgroundTasks):
-    try:
-        form = await request.form()
-        links = form.get("links", "").split(",")
-        links = [link.strip() for link in links if link.strip()]
-        
-        if not links:
-            return {"status": "error", "message": "No links provided"}
-            
-        print("🌙 Starting strategy analysis...")
-        
-        # Add the processing task to background tasks
-        background_tasks.add_task(process_strategy_background, links)
-        
-        return {"status": "success", "message": "Analysis started in background"}
-        
-    except Exception as e:
-        print(f"❌ Error in analyze_strategy: {e}")
-        return {"status": "error", "message": str(e)}
+    form = await request.form()
+    links = form.get("links", "").split("\n")
+    links = [link.strip() for link in links if link.strip()]
+    
+    if not links:
+        return JSONResponse({"status": "error", "message": "No links provided"})
+    
+    # Start processing in background
+    background_tasks.add_task(process_strategy_background, links)
+    
+    return JSONResponse({
+        "status": "success",
+        "message": "Analysis started"
+    })
 
 @app.get("/download/strategy/{filename}")
 async def download_strategy(filename: str):
@@ -187,11 +175,11 @@ async def download_backtest(filename: str):
 @app.get("/results")
 async def get_results():
     """Get current processing results"""
-    return {
+    return JSONResponse({
         "status": "success",
         "results": processing_results,
-        "complete": is_processing_complete
-    }
+        "is_complete": is_processing_complete
+    })
 
 if __name__ == "__main__":
     # Get port from environment variable (Heroku sets this)
