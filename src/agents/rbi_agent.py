@@ -164,23 +164,37 @@ def init_deepseek_client():
         if not deepseek_key:
             raise ValueError("🚨 DEEPSEEK_KEY not found in environment variables!")
             
+        print("🔑 Initializing DeepSeek client...")
+        print("🌟 Moon Dev's RBI Agent is connecting to DeepSeek...")
+        
         client = openai.OpenAI(
             api_key=deepseek_key,
             base_url=DEEPSEEK_BASE_URL
         )
-        cprint("🚀 Moon Dev's RBI Agent initialized with DeepSeek!", "green")
+        
+        print("✅ DeepSeek client initialized successfully!")
+        print("🚀 Moon Dev's RBI Agent ready to roll!")
         return client
     except Exception as e:
-        cprint(f"❌ Error initializing DeepSeek client: {e}", "red")
+        print(f"❌ Error initializing DeepSeek client: {str(e)}")
+        print("💡 Check if your DEEPSEEK_KEY is valid and properly set")
         return None
 
 def chat_with_deepseek(system_prompt, user_content, model):
     """Chat with DeepSeek API using specified model"""
+    print(f"\n🤖 Starting chat with DeepSeek using {model}...")
+    print("🌟 Moon Dev's RBI Agent is thinking...")
+    
     client = init_deepseek_client()
     if not client:
+        print("❌ Failed to initialize DeepSeek client")
         return None
         
     try:
+        print("📤 Sending request to DeepSeek API...")
+        print(f"🎯 Model: {model}")
+        print("🔄 Please wait while Moon Dev's RBI Agent processes your request...")
+        
         response = client.chat.completions.create(
             model=model,
             messages=[
@@ -189,9 +203,18 @@ def chat_with_deepseek(system_prompt, user_content, model):
             ],
             temperature=0.7
         )
+        
+        if not response or not response.choices:
+            print("❌ Empty response from DeepSeek API")
+            return None
+            
+        print("📥 Received response from DeepSeek API!")
+        print(f"✨ Response length: {len(response.choices[0].message.content)} characters")
         return response.choices[0].message.content.strip()
     except Exception as e:
-        cprint(f"❌ Error in DeepSeek chat: {e}", "red")
+        print(f"❌ Error in DeepSeek chat: {str(e)}")
+        print("💡 This could be due to API rate limits or invalid requests")
+        print(f"🔍 Error details: {str(e)}")
         return None
 
 def get_youtube_transcript(video_id):
@@ -353,12 +376,14 @@ def process_trading_idea(idea):
     cprint("\n🧪 Phase 1: Research", "yellow")
     strategy = research_strategy(content)
     if not strategy:
+        cprint("❌ Research phase failed", "red")
         return
         
     # Backtest Agent
     cprint("\n📈 Phase 2: Backtest", "yellow")
     backtest = create_backtest(strategy)
     if not backtest:
+        cprint("❌ Backtest phase failed", "red")
         return
         
     # Debug Agent
@@ -370,9 +395,19 @@ def process_trading_idea(idea):
         with open(filepath, 'w') as f:
             f.write(debugged_backtest)
         cprint(f"✨ Debug Agent made it shine! Final code saved to {filepath} 💎", "green")
+        
+        # Save the strategy with matching timestamp
+        strategy_filepath = RESEARCH_DIR / f"strategy_{get_model_id(RESEARCH_MODEL)}_{timestamp}.txt"
+        with open(strategy_filepath, 'w') as f:
+            f.write(strategy)
+        cprint(f"📝 Strategy saved to {strategy_filepath}", "green")
+    else:
+        cprint("❌ Debug phase failed", "red")
+        return
     
     cprint("\n🎉 Mission Accomplished! All agents completed successfully!", "green")
     cprint("🚀 Ready to make it rain! 💸", "cyan")
+    return True
 
 def debug_existing_backtests():
     """Debug all existing backtests in the backtests directory"""
