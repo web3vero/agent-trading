@@ -64,7 +64,7 @@ function cycleMessages(element, messages) {
 
 function addProgressMessage(phaseElement, message) {
     const messageDiv = document.createElement('div');
-    messageDiv.className = 'progress-message text-sm text-gray-400 mt-1';
+    messageDiv.className = 'progress-message text-sm text-gray-400 mt-1 message-animation';
     messageDiv.textContent = message;
     phaseElement.querySelector('.progress-messages').appendChild(messageDiv);
 }
@@ -81,50 +81,20 @@ function updatePhase(phaseElement, status = 'active') {
     }
 }
 
-async function processPhases(numStrategies) {
-    const phases = ['research', 'backtest', 'debug'];
-    const phaseElements = {
-        research: document.getElementById('researchPhase'),
-        backtest: document.getElementById('backtestPhase'),
-        debug: document.getElementById('debugPhase')
-    };
+async function processPhase(phaseElement, messages, timing) {
+    updatePhase(phaseElement);
+    const interval = timing / messages.length;
     
-    // Calculate total processing time needed
-    const totalTime = numStrategies * (PHASE_TIMINGS.research + PHASE_TIMINGS.backtest + PHASE_TIMINGS.debug);
-    let elapsedTime = 0;
+    // Clear previous messages
+    const messagesContainer = phaseElement.querySelector('.progress-messages');
+    messagesContainer.innerHTML = '';
     
-    while (elapsedTime < totalTime) {
-        for (const phase of phases) {
-            if (elapsedTime >= totalTime) break;
-            
-            // Clear all messages when starting a new research phase (beginning of loop)
-            if (phase === 'research') {
-                Object.values(phaseElements).forEach(element => {
-                    const messagesContainer = element.querySelector('.progress-messages');
-                    messagesContainer.innerHTML = '';
-                    element.classList.remove('phase-complete', 'active');
-                });
-            }
-            
-            const element = phaseElements[phase];
-            updatePhase(element);
-            
-            // Get messages for this phase
-            const messages = phase === 'research' ? researchMessages :
-                           phase === 'backtest' ? backtestMessages :
-                           debugMessages;
-            
-            const interval = PHASE_TIMINGS[phase] / messages.length;
-            
-            for (const message of messages) {
-                await new Promise(r => setTimeout(r, interval));
-                addProgressMessage(element, message);
-                elapsedTime += interval;
-            }
-            
-            updatePhase(element, 'complete');
-        }
+    for (const message of messages) {
+        await new Promise(r => setTimeout(r, interval));
+        addProgressMessage(phaseElement, message);
     }
+    
+    updatePhase(phaseElement, 'complete');
 }
 
 // Function to add or update a result in the results section
@@ -225,40 +195,54 @@ document.addEventListener('DOMContentLoaded', () => {
             const numStrategies = links.split(/[\n,]/).filter(link => link.trim()).length;
             
             // Start the phase animations
-            const phasePromise = processPhases(numStrategies);
+            const researchPhase = document.getElementById('researchPhase');
+            const backtestPhase = document.getElementById('backtestPhase');
+            const debugPhase = document.getElementById('debugPhase');
+            
+            // Process each phase
+            await processPhase(researchPhase, researchMessages, PHASE_TIMINGS.research);
+            await processPhase(backtestPhase, backtestMessages, PHASE_TIMINGS.backtest);
+            await processPhase(debugPhase, debugMessages, PHASE_TIMINGS.debug);
             
             // Start actual processing
+            console.log("🌙 Sending request to /analyze endpoint...");
             const response = await fetch('/analyze', {
                 method: 'POST',
                 body: formData
             });
             
+            console.log("📡 Received response from server");
             const data = await response.json();
+            console.log("🔍 Response data:", data);
             
             // Show results section
             results.classList.remove('hidden');
             resultsContent.innerHTML = ''; // Clear previous results
             
-            if (data.status === 'success') {
+            if (data.status === 'success' && Array.isArray(data.results)) {
+                console.log(`✨ Processing ${data.results.length} results`);
                 // Process each result
-                data.results.forEach(result => {
+                data.results.forEach((result, index) => {
+                    console.log(`📊 Processing result ${index + 1}:`, result);
                     updateResult(result);
                 });
             } else {
+                console.error("❌ Error in response:", data);
                 resultsContent.innerHTML = `
                     <div class="bg-red-900/50 text-red-200 p-6 rounded-lg error-animation">
                         <h3 class="text-xl font-bold mb-2">❌ Error</h3>
-                        <p>${data.message}</p>
+                        <p>${data.message || 'An unexpected error occurred in the response format'}</p>
                     </div>
                 `;
             }
         } catch (error) {
-            console.error('Error:', error);
+            console.error('❌ Error:', error);
             results.classList.remove('hidden');
             resultsContent.innerHTML = `
                 <div class="bg-red-900/50 text-red-200 p-6 rounded-lg error-animation">
                     <h3 class="text-xl font-bold mb-2">❌ Error</h3>
-                    <p>An unexpected error occurred. Please try again.</p>
+                    <p>An unexpected error occurred: ${error.message}</p>
+                    <p class="mt-2 text-sm">Please check the console for more details.</p>
                 </div>
             `;
         } finally {

@@ -101,23 +101,37 @@ async def analyze_strategy(links: str = Form(...)):
                 strategy_files = sorted(strategy_dir.glob("strategy_*.txt"), key=lambda x: x.stat().st_mtime, reverse=True)
                 backtest_files = sorted(backtest_dir.glob("backtest_final_*.py"), key=lambda x: x.stat().st_mtime, reverse=True)
                 
+                print(f"Found {len(strategy_files)} strategy files and {len(backtest_files)} backtest files")
+                
                 if strategy_files and backtest_files:
                     print(f"📄 Found files: {strategy_files[0].name}, {backtest_files[0].name}")
-                    # Read the strategy and backtest content
-                    with open(strategy_files[0], 'r') as f:
-                        strategy_content = f.read()
-                    with open(backtest_files[0], 'r') as f:
-                        backtest_content = f.read()
-                    
-                    result = {
-                        "strategy_number": i,
-                        "link": link,
-                        "strategy": strategy_content,
-                        "backtest": backtest_content,
-                        "strategy_file": str(strategy_files[0].name),
-                        "backtest_file": str(backtest_files[0].name),
-                        "status": "success"
-                    }
+                    try:
+                        # Read the strategy and backtest content
+                        with open(strategy_files[0], 'r') as f:
+                            strategy_content = f.read()
+                            print(f"✅ Successfully read strategy file: {len(strategy_content)} characters")
+                        with open(backtest_files[0], 'r') as f:
+                            backtest_content = f.read()
+                            print(f"✅ Successfully read backtest file: {len(backtest_content)} characters")
+                        
+                        result = {
+                            "strategy_number": i,
+                            "link": link,
+                            "strategy": strategy_content,
+                            "backtest": backtest_content,
+                            "strategy_file": str(strategy_files[0].name),
+                            "backtest_file": str(backtest_files[0].name),
+                            "status": "success"
+                        }
+                        print("✅ Successfully created result object")
+                    except Exception as e:
+                        print(f"❌ Error reading files: {str(e)}")
+                        result = {
+                            "strategy_number": i,
+                            "link": link,
+                            "error": f"Error reading output files: {str(e)}",
+                            "status": "error"
+                        }
                 else:
                     print(f"❌ No output files found for strategy {i}")
                     result = {
@@ -137,11 +151,14 @@ async def analyze_strategy(links: str = Form(...)):
                     "error": f"Error processing strategy: {str(e)}",
                     "status": "error"
                 })
-            
-        return JSONResponse({
+        
+        print("Preparing response with results...")
+        response_data = {
             "status": "success",
             "results": results
-        })
+        }
+        print(f"Response data prepared: {len(results)} results")
+        return JSONResponse(response_data)
             
     except Exception as e:
         error_msg = f"❌ Error in analyze endpoint: {str(e)}"
