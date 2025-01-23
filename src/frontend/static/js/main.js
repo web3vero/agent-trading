@@ -82,19 +82,43 @@ function updatePhase(phaseElement, status = 'active') {
 }
 
 async function processPhase(phaseElement, messages, timing) {
-    updatePhase(phaseElement);
-    const interval = timing / messages.length;
-    
     // Clear previous messages
     const messagesContainer = phaseElement.querySelector('.progress-messages');
     messagesContainer.innerHTML = '';
     
+    // Mark phase as active
+    updatePhase(phaseElement);
+    
+    // Calculate delay between messages
+    const messageDelay = timing / messages.length;
+    
+    // Add each message with animation
     for (const message of messages) {
-        await new Promise(r => setTimeout(r, interval));
-        addProgressMessage(phaseElement, message);
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'progress-message text-sm text-purple-300 mt-2 pl-4 message-animation';
+        messageDiv.innerHTML = `
+            <span class="inline-block mr-2">→</span>
+            ${message}
+        `;
+        messagesContainer.appendChild(messageDiv);
+        
+        // Force a reflow to trigger animation
+        void messageDiv.offsetWidth;
+        messageDiv.classList.add('active');
+        
+        // Wait before showing next message
+        await new Promise(r => setTimeout(r, messageDelay));
     }
     
+    // Mark phase as complete
     updatePhase(phaseElement, 'complete');
+    
+    // Keep messages visible
+    const allMessages = messagesContainer.querySelectorAll('.progress-message');
+    allMessages.forEach(msg => {
+        msg.style.opacity = '1';
+        msg.classList.add('completed');
+    });
 }
 
 // Function to add or update a result in the results section
@@ -283,4 +307,32 @@ function copyToClipboard(button) {
 
 // Add some fun console messages
 console.log("🌙 Moon Dev's RBI Agent Frontend loaded!");
-console.log("✨ Ready to discover some alpha!"); 
+console.log("✨ Ready to discover some alpha!");
+
+// Add CSS for message animations
+const style = document.createElement('style');
+style.textContent = `
+    .progress-message {
+        opacity: 0;
+        transform: translateX(-10px);
+        transition: all 0.5s ease-out;
+    }
+    
+    .progress-message.active {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    
+    .progress-message.completed {
+        color: #c4b5fd;
+    }
+    
+    .phase-complete .progress-message {
+        color: #34d399;
+    }
+    
+    .progress-messages {
+        min-height: 120px;
+    }
+`;
+document.head.appendChild(style); 
