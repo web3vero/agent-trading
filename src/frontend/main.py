@@ -22,7 +22,7 @@ else:
 
 # Verify required environment variables
 required_vars = [
-    "ANTHROPIC_API_KEY",
+    "DEEPSEEK_KEY",
     # Add other required keys here
 ]
 
