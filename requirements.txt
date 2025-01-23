@@ -9,3 +9,8 @@ solders>=0.19.0
 schedule>=1.2.0
 python-dateutil>=2.8.2
 backoff==2.2.1
+fastapi==0.95.2
+uvicorn==0.21.1
+python-multipart==0.0.6
+jinja2==3.1.2
+# Add any other dependencies your agents need

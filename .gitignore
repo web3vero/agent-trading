@@ -80,5 +80,10 @@ data/
 /Users/md/Dropbox/dev/github/moon-dev-ai-agents-for-trading/src/data
 
 # add this to gitignor /Users/md/Dropbox/dev/github/moon-dev-ai-agents-for-trading/src/data
-src/data
+
 src/audio
+/Users/md/Dropbox/dev/github/moon-dev-ai-agents-for-trading/src/data/agent_memory
+/Users/md/Dropbox/dev/github/moon-dev-ai-agents-for-trading/src/data/sentiment
+/Users/md/Dropbox/dev/github/moon-dev-ai-agents-for-trading/src/data/focus_history.csv
+/Users/md/Dropbox/dev/github/moon-dev-ai-agents-for-trading/src/data/private_data
+/Users/md/Dropbox/dev/github/moon-dev-ai-agents-for-trading/.replit

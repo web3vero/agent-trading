@@ -1,0 +1,10 @@
+run = "cd src/frontend && python main.py"
+language = "python3"
+entrypoint = "src/frontend/main.py"
+
+[nix]
+channel = "stable-22_11"
+
+[deployment]
+run = ["sh", "-c", "cd src/frontend && python main.py"]
+deploymentTarget = "cloudrun" 
