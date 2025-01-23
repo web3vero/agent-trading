@@ -247,6 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
         spinner.classList.remove('hidden');
         results.classList.add('hidden');
         processingAnimation.classList.remove('hidden');
+        resultsContent.innerHTML = ''; // Clear previous results
         
         // Start fun message cycle
         const messageInterval = cycleMessages(funMessageElement, funMessages);
@@ -280,17 +281,28 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Show results section
             results.classList.remove('hidden');
-            resultsContent.innerHTML = ''; // Clear previous results
             
             if (data.status === 'success') {
                 // Start polling for results
                 const pollInterval = setInterval(async () => {
-                    const complete = await pollForResults();
-                    if (complete) {
+                    try {
+                        const pollResponse = await fetch('/results');
+                        const pollData = await pollResponse.json();
+                        
+                        if (pollData.status === 'success' && pollData.results) {
+                            // Update UI with each result
+                            pollData.results.forEach(result => updateResult(result));
+                            
+                            if (pollData.complete) {
+                                clearInterval(pollInterval);
+                                spinner.classList.add('hidden');
+                                processingAnimation.classList.add('hidden');
+                                clearInterval(messageInterval);
+                            }
+                        }
+                    } catch (pollError) {
+                        console.error('❌ Error polling for results:', pollError);
                         clearInterval(pollInterval);
-                        spinner.classList.add('hidden');
-                        processingAnimation.classList.add('hidden');
-                        clearInterval(messageInterval);
                     }
                 }, 5000); // Poll every 5 seconds
             } else {
