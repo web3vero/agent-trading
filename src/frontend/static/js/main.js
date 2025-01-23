@@ -176,13 +176,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const resultsContent = document.getElementById('resultsContent');
     const spinner = document.getElementById('spinner');
     let pollInterval;
+    let retryCount = 0;
+    const MAX_RETRIES = 10;
 
     analyzeForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         
-        // Clear previous results and show spinner
+        // Reset state
         resultsContent.innerHTML = '';
         spinner.classList.remove('hidden');
+        retryCount = 0;
         
         console.log("🌙 Starting form submission...");
         
@@ -216,13 +219,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 await processPhase(researchPhase, researchMessages, PHASE_TIMINGS.research);
                 await processPhase(backtestPhase, backtestMessages, PHASE_TIMINGS.backtest);
                 await processPhase(debugPhase, debugMessages, PHASE_TIMINGS.debug);
-            } else {
-                console.error("❌ Error in response:", data);
-                showError(data.message || "An unexpected error occurred");
             }
         } catch (error) {
             console.error("❌ Error:", error);
-            showError(`An unexpected error occurred: ${error.message}`);
+            // Don't show error immediately, let polling handle it
         }
     });
 
@@ -230,6 +230,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("🔄 Starting polling interval...");
         if (pollInterval) clearInterval(pollInterval);
         
+        // Poll every 3 seconds instead of 5
         pollInterval = setInterval(async () => {
             try {
                 console.log("📡 Polling for results...");
@@ -239,6 +240,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 if (data.status === 'success' && Array.isArray(data.results)) {
                     console.log(`✨ Processing ${data.results.length} results`);
+                    retryCount = 0; // Reset retry count on successful response
                     
                     // Update results as they come in
                     data.results.forEach(result => {
@@ -252,14 +254,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 } else {
                     console.error("❌ Invalid results data:", data);
+                    handlePollingError();
                 }
             } catch (error) {
                 console.error("❌ Polling error:", error);
-                clearInterval(pollInterval);
-                spinner.classList.add('hidden');
-                showError(`Error fetching results: ${error.message}`);
+                handlePollingError();
             }
-        }, 5000);
+        }, 3000);
+    }
+
+    function handlePollingError() {
+        retryCount++;
+        console.log(`🔄 Retry attempt ${retryCount}/${MAX_RETRIES}`);
+        
+        if (retryCount >= MAX_RETRIES) {
+            clearInterval(pollInterval);
+            spinner.classList.add('hidden');
+            showError("Processing is taking longer than expected. Please check back in a few minutes.");
+        }
     }
 
     function showError(message) {
