@@ -1,57 +1,60 @@
 from fastapi import FastAPI, Request, Form, BackgroundTasks
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
-from fastapi.encoders import jsonable_encoder
-import uvicorn
-from pathlib import Path
-import sys
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 import os
-import json
+import sys
+from pathlib import Path
 from dotenv import load_dotenv
-import datetime
+import json
+from datetime import datetime
+import shutil
 
 # Load environment variables
 load_dotenv()
 
-# Verify required environment variables
-required_vars = [
-    "DEEPSEEK_KEY",
-    "PORT"  # Heroku provides PORT
-]
-
-missing_vars = [var for var in required_vars if not os.getenv(var)]
-if missing_vars:
-    print("❌ Missing required environment variables:", missing_vars)
-    print("Please set these in your .env file or Heroku config vars")
-    sys.exit(1)
-
-print("✅ All required environment variables found!")
-
-# Get the current directory
-FRONTEND_DIR = Path(__file__).parent
-PROJECT_ROOT = FRONTEND_DIR.parent
-
-# Add src directory to Python path
-sys.path.append(str(PROJECT_ROOT))
-
-from agents.rbi_agent import process_trading_idea
-
+# Initialize FastAPI app
 app = FastAPI(
     title="Moon Dev's RBI Agent 🌙",
     description="Research-Backtest-Implement Trading Strategies with AI",
     version="1.0.0"
 )
 
-# Mount static files
-app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR / "static")), name="static")
+# Get the project root directory
+PROJECT_ROOT = Path(__file__).parent.parent.parent
 
-# Templates
-templates = Jinja2Templates(directory=str(FRONTEND_DIR / "templates"))
+# Add src directory to Python path
+sys.path.append(str(PROJECT_ROOT / "src"))
 
-# Global variable to store results
+# Set up static files and templates
+app.mount("/static", StaticFiles(directory=str(PROJECT_ROOT / "src/frontend/static")), name="static")
+templates = Jinja2Templates(directory=str(PROJECT_ROOT / "src/frontend/templates"))
+
+# Required environment variables
+required_vars = ["DEEPSEEK_KEY"]
+missing_vars = [var for var in required_vars if not os.getenv(var)]
+
+if missing_vars:
+    print("❌ Missing required environment variables:", missing_vars)
+    print("Please set these in your .env file or Heroku config vars")
+    exit(1)
+
+print("✅ All required environment variables found!")
+
+# Use existing data directories in src/data/rbi
+data_dir = PROJECT_ROOT / "src/data/rbi"
+research_dir = data_dir / "research"
+backtests_dir = data_dir / "backtests"
+backtests_final_dir = data_dir / "backtests_final"
+
+print(f"📂 Using existing data directory: {data_dir}")
+
+# Global variables for results
 processing_results = []
 is_processing_complete = False
+
+# Import after setting up Python path
+from agents.rbi_agent import process_trading_idea
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
@@ -74,25 +77,16 @@ async def process_strategy_background(links: list):
         for i, link in enumerate(links, 1):
             print(f"🌙 Processing Strategy {i}: {link}")
             try:
-                # Clear old files
-                print("🧹 Clearing old files...")
-                strategy_dir = PROJECT_ROOT / "data/rbi/research"
-                backtest_dir = PROJECT_ROOT / "data/rbi/backtests_final"
-                
-                # Create directories if they don't exist
-                strategy_dir.mkdir(parents=True, exist_ok=True)
-                backtest_dir.mkdir(parents=True, exist_ok=True)
-                
                 # Process the strategy
                 process_trading_idea(link)
                 
                 print("🔍 Looking for output files...")
-                print(f"Strategy dir: {strategy_dir}")
-                print(f"Backtest dir: {backtest_dir}")
+                print(f"Strategy dir: {research_dir}")
+                print(f"Backtest dir: {backtests_final_dir}")
                 
                 # Get the most recent strategy and backtest files
-                strategy_files = list(strategy_dir.glob("*.txt"))
-                backtest_files = list(backtest_dir.glob("*.py"))
+                strategy_files = list(research_dir.glob("*.txt"))
+                backtest_files = list(backtests_final_dir.glob("*.py"))
                 
                 print(f"Found {len(strategy_files)} strategy files")
                 print(f"Found {len(backtest_files)} backtest files")
@@ -159,7 +153,7 @@ async def analyze_strategy(request: Request, background_tasks: BackgroundTasks):
 @app.get("/download/strategy/{filename}")
 async def download_strategy(filename: str):
     """Download a strategy file"""
-    file_path = PROJECT_ROOT / "data/rbi/research" / filename
+    file_path = research_dir / filename
     if file_path.exists():
         return FileResponse(
             path=file_path,
@@ -174,7 +168,7 @@ async def download_strategy(filename: str):
 @app.get("/download/backtest/{filename}")
 async def download_backtest(filename: str):
     """Download a backtest file"""
-    file_path = PROJECT_ROOT / "data/rbi/backtests_final" / filename
+    file_path = backtests_final_dir / filename
     if file_path.exists():
         return FileResponse(
             path=file_path,
@@ -196,13 +190,8 @@ async def get_results():
     })
 
 if __name__ == "__main__":
-    # Get port from environment variable (Heroku sets this)
+    import uvicorn
+    # Use PORT from environment if available (Heroku), otherwise default to 8000
     port = int(os.getenv("PORT", 8000))
-    
-    print("🌙 Moon Dev's RBI Agent Starting...")
-    print(f"📁 Frontend Directory: {FRONTEND_DIR}")
-    print(f"📁 Static Files: {FRONTEND_DIR / 'static'}")
-    print(f"📁 Templates: {FRONTEND_DIR / 'templates'}")
-    
-    # Start server with host 0.0.0.0 for Heroku
-    uvicorn.run("main:app", host="0.0.0.0", port=port) 
+    print(f"🚀 Starting server on port {port}")
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True) 
