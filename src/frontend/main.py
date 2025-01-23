@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form
+from fastapi import FastAPI, Request, Form, BackgroundTasks
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
@@ -9,6 +9,7 @@ import sys
 import os
 import json
 from dotenv import load_dotenv
+import datetime
 
 # Load environment variables
 load_dotenv()
@@ -48,6 +49,10 @@ app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR / "static")), name="
 # Templates
 templates = Jinja2Templates(directory=str(FRONTEND_DIR / "templates"))
 
+# Global variable to store results
+processing_results = []
+is_processing_complete = False
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     """Render the home page"""
@@ -56,36 +61,30 @@ async def home(request: Request):
         {"request": request, "title": "Moon Dev's RBI Agent 🌙"}
     )
 
-@app.post("/analyze")
-async def analyze_strategy(links: str = Form(...)):
-    """Process trading strategy links"""
+async def process_strategy_background(links: list):
+    """Process strategies in the background"""
+    global processing_results, is_processing_complete
+    
     try:
-        print("🌙 Starting strategy analysis...")
+        processing_results = []
+        is_processing_complete = False
         
-        # Create required directories
-        for dir_path in [
-            PROJECT_ROOT / "data",
-            PROJECT_ROOT / "data/rbi",
-            PROJECT_ROOT / "data/rbi/research",
-            PROJECT_ROOT / "data/rbi/backtests",
-            PROJECT_ROOT / "data/rbi/backtests_final"
-        ]:
-            dir_path.mkdir(parents=True, exist_ok=True)
-            print(f"📁 Ensuring directory exists: {dir_path}")
-        
-        # Split links by newline or comma
-        links_list = [link.strip() for link in links.replace('\n', ',').split(',') if link.strip()]
-        print(f"🔍 Processing {len(links_list)} links: {links_list}")
-        
-        results = []
-        
-        for i, link in enumerate(links_list, 1):
+        for i, link in enumerate(links, 1):
             try:
                 print(f"🌙 Processing Strategy {i}: {link}")
                 
                 # Get the latest strategy and backtest files
                 strategy_dir = PROJECT_ROOT / "data/rbi/research"
                 backtest_dir = PROJECT_ROOT / "data/rbi/backtests_final"
+                
+                # Clear old files to prevent using cached results
+                print("🧹 Clearing old files...")
+                for file in strategy_dir.glob("strategy_*.txt"):
+                    print(f"  🗑️ Removing old strategy file: {file.name}")
+                    file.unlink()
+                for file in backtest_dir.glob("backtest_final_*.py"):
+                    print(f"  🗑️ Removing old backtest file: {file.name}")
+                    file.unlink()
                 
                 # Process the strategy
                 process_trading_idea(link)
@@ -94,39 +93,22 @@ async def analyze_strategy(links: str = Form(...)):
                 strategy_files = sorted(strategy_dir.glob("strategy_*.txt"), key=lambda x: x.stat().st_mtime, reverse=True)
                 backtest_files = sorted(backtest_dir.glob("backtest_final_*.py"), key=lambda x: x.stat().st_mtime, reverse=True)
                 
-                print(f"Found {len(strategy_files)} strategy files and {len(backtest_files)} backtest files")
-                
                 if strategy_files and backtest_files:
-                    print(f"📄 Found files: {strategy_files[0].name}, {backtest_files[0].name}")
-                    try:
-                        # Read the strategy and backtest content
-                        with open(strategy_files[0], 'r') as f:
-                            strategy_content = f.read()
-                            print(f"✅ Successfully read strategy file: {len(strategy_content)} characters")
-                        with open(backtest_files[0], 'r') as f:
-                            backtest_content = f.read()
-                            print(f"✅ Successfully read backtest file: {len(backtest_content)} characters")
-                        
-                        result = {
-                            "strategy_number": i,
-                            "link": link,
-                            "strategy": strategy_content,
-                            "backtest": backtest_content,
-                            "strategy_file": str(strategy_files[0].name),
-                            "backtest_file": str(backtest_files[0].name),
-                            "status": "success"
-                        }
-                        print("✅ Successfully created result object")
-                    except Exception as e:
-                        print(f"❌ Error reading files: {str(e)}")
-                        result = {
-                            "strategy_number": i,
-                            "link": link,
-                            "error": f"Error reading output files: {str(e)}",
-                            "status": "error"
-                        }
+                    with open(strategy_files[0], 'r') as f:
+                        strategy_content = f.read()
+                    with open(backtest_files[0], 'r') as f:
+                        backtest_content = f.read()
+                    
+                    result = {
+                        "strategy_number": i,
+                        "link": link,
+                        "strategy": strategy_content,
+                        "backtest": backtest_content,
+                        "strategy_file": str(strategy_files[0].name),
+                        "backtest_file": str(backtest_files[0].name),
+                        "status": "success"
+                    }
                 else:
-                    print(f"❌ No output files found for strategy {i}")
                     result = {
                         "strategy_number": i,
                         "link": link,
@@ -134,32 +116,43 @@ async def analyze_strategy(links: str = Form(...)):
                         "status": "error"
                     }
                 
-                results.append(result)
-                print(f"🚀 Strategy {i} complete!")
+                processing_results.append(result)
+                
             except Exception as e:
-                print(f"❌ Error processing strategy {i}: {str(e)}")
-                results.append({
+                print(f"❌ Error processing strategy {i}: {e}")
+                processing_results.append({
                     "strategy_number": i,
                     "link": link,
                     "error": f"Error processing strategy: {str(e)}",
                     "status": "error"
                 })
         
-        print("Preparing response with results...")
-        response_data = {
-            "status": "success",
-            "results": results
-        }
-        print(f"Response data prepared: {len(results)} results")
-        return JSONResponse(response_data)
-            
+        is_processing_complete = True
+        
     except Exception as e:
-        error_msg = f"❌ Error in analyze endpoint: {str(e)}"
-        print(error_msg)
-        return JSONResponse({
-            "status": "error",
-            "message": error_msg
-        })
+        print(f"❌ Error processing strategies: {e}")
+        is_processing_complete = True
+
+@app.post("/analyze")
+async def analyze_strategy(request: Request, background_tasks: BackgroundTasks):
+    try:
+        form = await request.form()
+        links = form.get("links", "").split(",")
+        links = [link.strip() for link in links if link.strip()]
+        
+        if not links:
+            return {"status": "error", "message": "No links provided"}
+            
+        print("🌙 Starting strategy analysis...")
+        
+        # Add the processing task to background tasks
+        background_tasks.add_task(process_strategy_background, links)
+        
+        return {"status": "success", "message": "Analysis started in background"}
+        
+    except Exception as e:
+        print(f"❌ Error in analyze_strategy: {e}")
+        return {"status": "error", "message": str(e)}
 
 @app.get("/download/strategy/{filename}")
 async def download_strategy(filename: str):
@@ -190,6 +183,15 @@ async def download_backtest(filename: str):
         "status": "error",
         "message": "File not found"
     })
+
+@app.get("/results")
+async def get_results():
+    """Get current processing results"""
+    return {
+        "status": "success",
+        "results": processing_results,
+        "complete": is_processing_complete
+    }
 
 if __name__ == "__main__":
     # Get port from environment variable (Heroku sets this)

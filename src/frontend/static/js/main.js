@@ -171,6 +171,61 @@ function updateResult(result) {
     }
 }
 
+async function pollForResults() {
+    try {
+        const response = await fetch('/results');
+        const data = await response.json();
+        
+        if (data.status === 'success' && data.results) {
+            // Update UI with results
+            data.results.forEach(result => {
+                if (result.status === 'success') {
+                    const resultHtml = `
+                        <div class="mb-8 p-4 bg-gray-800 rounded-lg">
+                            <h3 class="text-xl font-bold mb-4">Strategy ${result.strategy_number} Results</h3>
+                            
+                            <div class="mb-6">
+                                <h4 class="text-lg font-semibold mb-2">Strategy Analysis</h4>
+                                <pre class="bg-gray-900 p-4 rounded overflow-x-auto">${result.strategy}</pre>
+                                <a href="/download/strategy/${result.strategy_file}" class="text-blue-400 hover:text-blue-300">
+                                    Download Strategy
+                                </a>
+                            </div>
+                            
+                            <div>
+                                <h4 class="text-lg font-semibold mb-2">Backtest Implementation</h4>
+                                <pre class="bg-gray-900 p-4 rounded overflow-x-auto">${result.backtest}</pre>
+                                <a href="/download/backtest/${result.backtest_file}" class="text-blue-400 hover:text-blue-300">
+                                    Download Backtest
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                    document.getElementById('results').innerHTML += resultHtml;
+                } else {
+                    // Handle error for this strategy
+                    const errorHtml = `
+                        <div class="mb-8 p-4 bg-red-900 rounded-lg">
+                            <h3 class="text-xl font-bold mb-4">Strategy ${result.strategy_number} Error</h3>
+                            <p class="text-red-300">${result.error}</p>
+                        </div>
+                    `;
+                    document.getElementById('results').innerHTML += errorHtml;
+                }
+            });
+            
+            if (data.complete) {
+                // Stop polling when processing is complete
+                return true;
+            }
+        }
+        return false;
+    } catch (error) {
+        console.error('Error polling for results:', error);
+        return true; // Stop polling on error
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('analyzeForm');
     const spinner = document.getElementById('spinner');
@@ -227,13 +282,17 @@ document.addEventListener('DOMContentLoaded', () => {
             results.classList.remove('hidden');
             resultsContent.innerHTML = ''; // Clear previous results
             
-            if (data.status === 'success' && Array.isArray(data.results)) {
-                console.log(`✨ Processing ${data.results.length} results`);
-                // Process each result
-                data.results.forEach((result, index) => {
-                    console.log(`📊 Processing result ${index + 1}:`, result);
-                    updateResult(result);
-                });
+            if (data.status === 'success') {
+                // Start polling for results
+                const pollInterval = setInterval(async () => {
+                    const complete = await pollForResults();
+                    if (complete) {
+                        clearInterval(pollInterval);
+                        spinner.classList.add('hidden');
+                        processingAnimation.classList.add('hidden');
+                        clearInterval(messageInterval);
+                    }
+                }, 5000); // Poll every 5 seconds
             } else {
                 console.error("❌ Error in response:", data);
                 resultsContent.innerHTML = `
@@ -242,6 +301,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         <p>${data.message || 'An unexpected error occurred in the response format'}</p>
                     </div>
                 `;
+                spinner.classList.add('hidden');
+                processingAnimation.classList.add('hidden');
+                clearInterval(messageInterval);
             }
         } catch (error) {
             console.error('❌ Error:', error);
@@ -253,8 +315,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p class="mt-2 text-sm">Please check the console for more details.</p>
                 </div>
             `;
-        } finally {
-            // Clean up
             spinner.classList.add('hidden');
             processingAnimation.classList.add('hidden');
             clearInterval(messageInterval);
