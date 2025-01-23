@@ -24,7 +24,7 @@
     <main class="container mx-auto px-4 py-4">
         <!-- Input form -->
         <div class="max-w-2xl mx-auto bg-gray-800 rounded-lg p-4 mb-6">
-            <form id="analyzeForm" class="space-y-3">
+            <form id="analyzeForm" class="space-y-3" method="POST" action="/analyze">
                 <div>
                     <label for="links" class="block text-lg text-gray-300 mb-2">
                         Enter trading strategies for ai agents to build backtests for - more info <a href="https://moondev.com" class="text-purple-400 hover:text-purple-300 hover:underline" target="_blank">here</a> 🚀
@@ -115,5 +115,57 @@
 
     <!-- Custom JS -->
     <script src="{{ url_for('static', path='/js/main.js') }}"></script>
+    <script>
+    document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
+        e.preventDefault(); // Prevent default form submission
+        
+        // Show loading states
+        const spinner = document.getElementById('spinner');
+        const results = document.getElementById('results');
+        const processingAnimation = document.getElementById('processingAnimation');
+        
+        spinner.classList.remove('hidden');
+        results.classList.add('hidden');
+        processingAnimation.classList.remove('hidden');
+        
+        try {
+            const formData = new FormData(e.target);
+            const response = await fetch('/analyze', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            // Show results section
+            results.classList.remove('hidden');
+            const resultsContent = document.getElementById('resultsContent');
+            resultsContent.innerHTML = ''; // Clear previous results
+            
+            if (data.status === 'success') {
+                data.results.forEach(result => updateResult(result));
+            } else {
+                resultsContent.innerHTML = `
+                    <div class="bg-red-900/50 text-red-200 p-6 rounded-lg error-animation">
+                        <h3 class="text-xl font-bold mb-2">❌ Error</h3>
+                        <p>${data.message}</p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            results.classList.remove('hidden');
+            resultsContent.innerHTML = `
+                <div class="bg-red-900/50 text-red-200 p-6 rounded-lg error-animation">
+                    <h3 class="text-xl font-bold mb-2">❌ Error</h3>
+                    <p>An unexpected error occurred. Please try again.</p>
+                </div>
+            `;
+        } finally {
+            spinner.classList.add('hidden');
+            processingAnimation.classList.add('hidden');
+        }
+    });
+    </script>
 </body>
 </html> 
