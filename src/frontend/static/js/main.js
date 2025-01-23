@@ -171,61 +171,6 @@ function updateResult(result) {
     }
 }
 
-async function pollForResults() {
-    try {
-        const response = await fetch('/results');
-        const data = await response.json();
-        
-        if (data.status === 'success' && data.results) {
-            // Update UI with results
-            data.results.forEach(result => {
-                if (result.status === 'success') {
-                    const resultHtml = `
-                        <div class="mb-8 p-4 bg-gray-800 rounded-lg">
-                            <h3 class="text-xl font-bold mb-4">Strategy ${result.strategy_number} Results</h3>
-                            
-                            <div class="mb-6">
-                                <h4 class="text-lg font-semibold mb-2">Strategy Analysis</h4>
-                                <pre class="bg-gray-900 p-4 rounded overflow-x-auto">${result.strategy}</pre>
-                                <a href="/download/strategy/${result.strategy_file}" class="text-blue-400 hover:text-blue-300">
-                                    Download Strategy
-                                </a>
-                            </div>
-                            
-                            <div>
-                                <h4 class="text-lg font-semibold mb-2">Backtest Implementation</h4>
-                                <pre class="bg-gray-900 p-4 rounded overflow-x-auto">${result.backtest}</pre>
-                                <a href="/download/backtest/${result.backtest_file}" class="text-blue-400 hover:text-blue-300">
-                                    Download Backtest
-                                </a>
-                            </div>
-                        </div>
-                    `;
-                    document.getElementById('results').innerHTML += resultHtml;
-                } else {
-                    // Handle error for this strategy
-                    const errorHtml = `
-                        <div class="mb-8 p-4 bg-red-900 rounded-lg">
-                            <h3 class="text-xl font-bold mb-4">Strategy ${result.strategy_number} Error</h3>
-                            <p class="text-red-300">${result.error}</p>
-                        </div>
-                    `;
-                    document.getElementById('results').innerHTML += errorHtml;
-                }
-            });
-            
-            if (data.complete) {
-                // Stop polling when processing is complete
-                return true;
-            }
-        }
-        return false;
-    } catch (error) {
-        console.error('Error polling for results:', error);
-        return true; // Stop polling on error
-    }
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('analyzeForm');
     const spinner = document.getElementById('spinner');
@@ -236,64 +181,69 @@ document.addEventListener('DOMContentLoaded', () => {
     
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        console.log("🌟 Form submitted");
         
-        // Reset all progress messages and states
+        // Reset UI state
         document.querySelectorAll('.progress-messages').forEach(el => el.innerHTML = '');
         document.querySelectorAll('.processing-phase').forEach(el => {
             el.classList.remove('active', 'phase-complete', 'phase-error');
         });
         
-        // Reset and show processing animation
         spinner.classList.remove('hidden');
         results.classList.add('hidden');
         processingAnimation.classList.remove('hidden');
-        resultsContent.innerHTML = ''; // Clear previous results
+        resultsContent.innerHTML = '';
         
-        // Start fun message cycle
         const messageInterval = cycleMessages(funMessageElement, funMessages);
         
         try {
-            // Count number of strategies to process
             const formData = new FormData(form);
             const links = formData.get('links');
-            const numStrategies = links.split(/[\n,]/).filter(link => link.trim()).length;
+            console.log("🔗 Processing links:", links);
             
-            // Start actual processing first
-            console.log("🌙 Sending request to /analyze endpoint...");
+            // Start processing
+            console.log("🚀 Sending request to /analyze endpoint");
             const response = await fetch('/analyze', {
                 method: 'POST',
                 body: formData
             });
             
-            console.log("📡 Received response from server");
+            console.log("📡 Received response");
             const data = await response.json();
-            console.log("🔍 Response data:", data);
+            console.log("📦 Response data:", data);
             
             if (data.status === 'success') {
-                // Start the phase animations
+                console.log("✅ Analysis started successfully");
+                
+                // Start animations
                 const researchPhase = document.getElementById('researchPhase');
                 const backtestPhase = document.getElementById('backtestPhase');
                 const debugPhase = document.getElementById('debugPhase');
                 
-                // Process each phase
                 await processPhase(researchPhase, researchMessages, PHASE_TIMINGS.research);
                 await processPhase(backtestPhase, backtestMessages, PHASE_TIMINGS.backtest);
                 await processPhase(debugPhase, debugMessages, PHASE_TIMINGS.debug);
                 
-                // Show results section
+                // Show results section and start polling
                 results.classList.remove('hidden');
+                console.log("🔄 Starting results polling");
                 
-                // Start polling for results
                 const pollInterval = setInterval(async () => {
                     try {
+                        console.log("📊 Polling for results...");
                         const pollResponse = await fetch('/results');
                         const pollData = await pollResponse.json();
+                        console.log("📥 Poll data:", pollData);
                         
-                        if (pollData.status === 'success' && pollData.results) {
-                            // Update UI with each result
-                            pollData.results.forEach(result => updateResult(result));
+                        if (pollData.status === 'success' && Array.isArray(pollData.results)) {
+                            console.log(`📋 Processing ${pollData.results.length} results`);
+                            pollData.results.forEach(result => {
+                                console.log(`🔍 Processing result for strategy ${result.strategy_number}`);
+                                updateResult(result);
+                            });
                             
                             if (pollData.complete) {
+                                console.log("✨ Processing complete!");
                                 clearInterval(pollInterval);
                                 spinner.classList.add('hidden');
                                 processingAnimation.classList.add('hidden');
@@ -301,12 +251,20 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         }
                     } catch (pollError) {
-                        console.error('❌ Error polling for results:', pollError);
+                        console.error('❌ Polling error:', pollError);
                         clearInterval(pollInterval);
+                        
+                        resultsContent.innerHTML = `
+                            <div class="bg-red-900/50 text-red-200 p-6 rounded-lg error-animation">
+                                <h3 class="text-xl font-bold mb-2">❌ Error</h3>
+                                <p>Error retrieving results: ${pollError.message}</p>
+                            </div>
+                        `;
                     }
-                }, 5000); // Poll every 5 seconds
+                }, 5000);
             } else {
                 console.error("❌ Error in response:", data);
+                results.classList.remove('hidden');
                 resultsContent.innerHTML = `
                     <div class="bg-red-900/50 text-red-200 p-6 rounded-lg error-animation">
                         <h3 class="text-xl font-bold mb-2">❌ Error</h3>
