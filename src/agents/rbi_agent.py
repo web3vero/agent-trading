@@ -73,7 +73,6 @@ IMPORTANT DATA HANDLING:
    - Break down list parameters (like Fibonacci levels) into individual parameters
    - Use ranges for optimization (e.g., fib_level_1=range(30, 40, 2))
 
-
 INDICATOR CALCULATION RULES:
 1. ALWAYS use self.I() wrapper for ANY indicator calculations
 2. Use talib functions instead of pandas operations:
@@ -98,7 +97,7 @@ RISK MANAGEMENT:
 
 If you need indicators use TA lib or pandas TA. Do not use backtesting.py's indicators. 
 
-Use this data path: /Users/md/Dropbox/dev/github/moon-dev-ai-agents-for-trading/src/data/rbi/BTC-USD-15m.csv
+Use this data path: {DATA_DIR}/BTC-USD-15m.csv
 the above data head looks like below
 datetime, open, high, low, close, volume,
 2023-01-01 00:00:00, 16531.83, 16532.69, 16509.11, 16510.82, 231.05338022,
@@ -148,14 +147,17 @@ import sys
 # DeepSeek Configuration
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 
-# Create necessary directories
-DATA_DIR = Path("src/data/rbi")
+# Use existing data directories
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+DATA_DIR = PROJECT_ROOT / "src/data/rbi"
 RESEARCH_DIR = DATA_DIR / "research"
 BACKTEST_DIR = DATA_DIR / "backtests"
 FINAL_BACKTEST_DIR = DATA_DIR / "backtests_final"
 
-for directory in [DATA_DIR, RESEARCH_DIR, BACKTEST_DIR, FINAL_BACKTEST_DIR]:
-    directory.mkdir(parents=True, exist_ok=True)
+print(f"📂 Using RBI data directory: {DATA_DIR}")
+print(f"📂 Research directory: {RESEARCH_DIR}")
+print(f"📂 Backtest directory: {BACKTEST_DIR}")
+print(f"📂 Final backtest directory: {FINAL_BACKTEST_DIR}")
 
 def init_deepseek_client():
     """Initialize DeepSeek client with proper error handling"""
