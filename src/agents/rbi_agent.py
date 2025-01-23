@@ -169,8 +169,7 @@ def init_deepseek_client():
         
         client = openai.OpenAI(
             api_key=deepseek_key,
-            base_url=DEEPSEEK_BASE_URL,
-            default_headers={"Content-Type": "application/json"}
+            base_url=DEEPSEEK_BASE_URL
         )
         
         print("✅ DeepSeek client initialized successfully!")
