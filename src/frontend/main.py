@@ -9,6 +9,30 @@ import sys
 import os
 import json
 import asyncio
+from dotenv import load_dotenv
+
+# Load environment variables
+if os.getenv("REPL_ID"):  # Check if running on Repl.it
+    # Repl.it secrets are automatically loaded into os.environ
+    print("🌙 Running on Repl.it - using secrets")
+else:
+    # Local development - load from .env
+    load_dotenv()
+    print("🌙 Running locally - using .env file")
+
+# Verify required environment variables
+required_vars = [
+    "ANTHROPIC_API_KEY",
+    # Add other required keys here
+]
+
+missing_vars = [var for var in required_vars if not os.getenv(var)]
+if missing_vars:
+    print("❌ Missing required environment variables:", missing_vars)
+    print("Please set these in .env file (local) or Secrets (Repl.it)")
+    sys.exit(1)
+
+print("✅ All required environment variables found!")
 
 # Get the current directory
 FRONTEND_DIR = Path(__file__).parent
