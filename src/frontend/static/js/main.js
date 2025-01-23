@@ -234,7 +234,15 @@ document.addEventListener('DOMContentLoaded', function() {
         pollInterval = setInterval(async () => {
             try {
                 console.log("📡 Polling for results...");
-                const response = await fetch('/results');
+                const response = await fetch('/results', {
+                    // Add timeout of 10 seconds for each request
+                    signal: AbortSignal.timeout(10000)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const data = await response.json();
                 console.log("📥 Received polling data:", data);
                 
@@ -253,24 +261,41 @@ document.addEventListener('DOMContentLoaded', function() {
                         spinner.classList.add('hidden');
                     }
                 } else {
-                    console.error("❌ Invalid results data:", data);
-                    handlePollingError();
+                    console.warn("⚠️ Invalid results data:", data);
+                    handlePollingError("Still processing...");
                 }
             } catch (error) {
                 console.error("❌ Polling error:", error);
-                handlePollingError();
+                if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+                    handlePollingError("Still processing your strategy... This may take a few minutes.");
+                } else {
+                    handlePollingError("Error fetching results. Will retry...");
+                }
             }
         }, 3000);
     }
 
-    function handlePollingError() {
+    function handlePollingError(message = "Processing is taking longer than expected...") {
         retryCount++;
         console.log(`🔄 Retry attempt ${retryCount}/${MAX_RETRIES}`);
+        
+        // Show a more informative message in the UI
+        const statusMessage = document.createElement('div');
+        statusMessage.className = 'text-purple-400 mt-4 text-center';
+        statusMessage.innerHTML = `${message} (Attempt ${retryCount}/${MAX_RETRIES})`;
+        
+        // Only append if there isn't already a status message
+        const existingStatus = resultsContent.querySelector('.text-purple-400');
+        if (!existingStatus) {
+            resultsContent.appendChild(statusMessage);
+        } else {
+            existingStatus.innerHTML = statusMessage.innerHTML;
+        }
         
         if (retryCount >= MAX_RETRIES) {
             clearInterval(pollInterval);
             spinner.classList.add('hidden');
-            showError("Processing is taking longer than expected. Please check back in a few minutes.");
+            showError("Strategy processing is taking longer than expected. Please check back in a few minutes - your results will be saved!");
         }
     }
 
