@@ -82,43 +82,27 @@ function updatePhase(phaseElement, status = 'active') {
 }
 
 async function processPhase(phaseElement, messages, timing) {
+    updatePhase(phaseElement);
+    const interval = timing / messages.length;
+    
     // Clear previous messages
     const messagesContainer = phaseElement.querySelector('.progress-messages');
     messagesContainer.innerHTML = '';
     
-    // Mark phase as active
-    updatePhase(phaseElement);
-    
-    // Calculate delay between messages
-    const messageDelay = timing / messages.length;
-    
     // Add each message with animation
     for (const message of messages) {
+        await new Promise(r => setTimeout(r, interval));
         const messageDiv = document.createElement('div');
-        messageDiv.className = 'progress-message text-sm text-purple-300 mt-2 pl-4 message-animation';
+        messageDiv.className = 'progress-message text-sm text-purple-300 message-animation';
         messageDiv.innerHTML = `
             <span class="inline-block mr-2">→</span>
             ${message}
         `;
         messagesContainer.appendChild(messageDiv);
-        
-        // Force a reflow to trigger animation
-        void messageDiv.offsetWidth;
-        messageDiv.classList.add('active');
-        
-        // Wait before showing next message
-        await new Promise(r => setTimeout(r, messageDelay));
     }
     
     // Mark phase as complete
     updatePhase(phaseElement, 'complete');
-    
-    // Keep messages visible
-    const allMessages = messagesContainer.querySelectorAll('.progress-message');
-    allMessages.forEach(msg => {
-        msg.style.opacity = '1';
-        msg.classList.add('completed');
-    });
 }
 
 // Function to add or update a result in the results section
@@ -312,27 +296,49 @@ console.log("✨ Ready to discover some alpha!");
 // Add CSS for message animations
 const style = document.createElement('style');
 style.textContent = `
-    .progress-message {
+    .message-animation {
         opacity: 0;
-        transform: translateX(-10px);
-        transition: all 0.5s ease-out;
+        animation: fadeInSlide 0.5s ease-out forwards;
     }
     
-    .progress-message.active {
+    @keyframes fadeInSlide {
+        from {
+            opacity: 0;
+            transform: translateX(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    .processing-phase {
+        opacity: 0.4;
+        transition: opacity 0.3s ease;
+    }
+    
+    .processing-phase.active {
         opacity: 1;
-        transform: translateX(0);
     }
     
-    .progress-message.completed {
-        color: #c4b5fd;
-    }
-    
-    .phase-complete .progress-message {
+    .phase-complete .phase-icon {
         color: #34d399;
+        animation: completePulse 0.5s ease-out;
     }
     
-    .progress-messages {
-        min-height: 120px;
+    @keyframes completePulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.2); }
+        100% { transform: scale(1); }
+    }
+    
+    .fun-message {
+        animation: fadeInOut 4s ease-in-out infinite;
+    }
+    
+    @keyframes fadeInOut {
+        0%, 100% { opacity: 0.4; }
+        50% { opacity: 1; }
     }
 `;
 document.head.appendChild(style); 

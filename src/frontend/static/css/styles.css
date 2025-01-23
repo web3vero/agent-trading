@@ -1,5 +1,11 @@
 /* Moon Dev's Custom Styles 🌙 */
 
+/* Dark theme */
+body {
+    background-color: #0f172a;
+    color: #f8fafc;
+}
+
 /* Rotating moon animation */
 @keyframes moonRotate {
     0% { transform: rotate(0deg); }
@@ -30,16 +36,73 @@ h1 {
     opacity: 1;
 }
 
-/* Phase icon pulse */
-@keyframes iconPulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.2); }
-    100% { transform: scale(1); }
-}
-
+/* Phase icon animations */
 .phase-icon {
     color: #9333ea;
-    animation: iconPulse 2s ease-in-out infinite;
+    transition: color 0.3s ease;
+}
+
+.phase-complete .phase-icon {
+    color: #34d399;
+}
+
+/* Message animations */
+.message-animation {
+    opacity: 0;
+    animation: fadeInSlide 0.5s ease-out forwards;
+}
+
+@keyframes fadeInSlide {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Fun message animation */
+.fun-message {
+    animation: fadeInOut 4s ease-in-out infinite;
+}
+
+@keyframes fadeInOut {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+}
+
+/* Code block styling */
+.code-block {
+    background: #1e293b;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    position: relative;
+}
+
+.code-block pre {
+    margin: 0;
+    white-space: pre-wrap;
+    font-family: 'Fira Code', monospace;
+}
+
+.copy-button {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.3);
+    border: none;
+    border-radius: 0.25rem;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.copy-button:hover {
+    background: rgba(0, 0, 0, 0.5);
+    color: #f8fafc;
 }
 
 /* Loading dots animation */
@@ -61,26 +124,6 @@ h1 {
 
 .loading-dots span:nth-child(3) {
     animation-delay: 0.4s;
-}
-
-/* Fun message cycle animation */
-@keyframes messageFade {
-    0%, 100% { opacity: 0; transform: translateY(10px); }
-    10%, 90% { opacity: 1; transform: translateY(0); }
-}
-
-.fun-message {
-    animation: messageFade 4s ease-in-out infinite;
-}
-
-/* Progress message appear animation */
-@keyframes messageAppear {
-    from { opacity: 0; transform: translateX(-20px); }
-    to { opacity: 1; transform: translateX(0); }
-}
-
-.progress-message {
-    animation: messageAppear 0.5s ease-out forwards;
 }
 
 /* Phase completion animation */
@@ -114,88 +157,7 @@ button:hover {
     transition: all 0.3s ease;
 }
 
-/* Code block styling */
-.code-block {
-    background: #1a1a1a;
-    border-radius: 8px;
-    padding: 1rem;
-    margin: 1rem 0;
-    position: relative;
-}
-
-.code-block pre {
-    margin: 0;
-    padding: 0;
-    white-space: pre-wrap;
-    font-family: 'Fira Code', monospace;
-}
-
-.copy-button {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    padding: 0.5rem;
-    background: #333;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    opacity: 0.7;
-    transition: opacity 0.2s;
-}
-
-.copy-button:hover {
-    opacity: 1;
-}
-
-/* Success animation */
-@keyframes successPop {
-    0% { transform: scale(0.8); opacity: 0; }
-    50% { transform: scale(1.2); }
-    100% { transform: scale(1); opacity: 1; }
-}
-
-.success-animation {
-    animation: successPop 0.5s ease-out forwards;
-}
-
-/* Error shake animation */
-@keyframes errorShake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-10px); }
-    75% { transform: translateX(10px); }
-}
-
-.error-animation {
-    animation: errorShake 0.5s ease-in-out;
-}
-
-/* Responsive adjustments */
-@media (max-width: 640px) {
-    .container {
-        padding: 1rem;
-    }
-    
-    h1 {
-        font-size: 1.8rem;
-    }
-}
-
-/* Message animations */
-.message-animation {
-    opacity: 0;
-    animation: fadeIn 0.5s ease-in forwards;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
 /* Existing styles */
-.moon-rotate {
-    animation: rotate 10s linear infinite;
-}
-
 @keyframes rotate {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
@@ -217,15 +179,6 @@ button:hover {
     100% { opacity: 0; }
 }
 
-.fun-message {
-    animation: fadeInOut 0.5s ease-in-out;
-}
-
-@keyframes fadeInOut {
-    0% { opacity: 0; transform: translateY(-10px); }
-    100% { opacity: 1; transform: translateY(0); }
-}
-
 .success-animation {
     animation: slideIn 0.5s ease-out;
 }
@@ -243,10 +196,6 @@ button:hover {
     0%, 100% { transform: translateX(0); }
     25% { transform: translateX(-10px); }
     75% { transform: translateX(10px); }
-}
-
-.phase-icon {
-    transition: color 0.3s ease;
 }
 
 .processing-phase.active .phase-icon {
@@ -285,4 +234,47 @@ button:hover {
 
 .copy-button:hover {
     background: rgba(0, 0, 0, 0.5);
+}
+
+/* Progress message appear animation */
+@keyframes messageAppear {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.progress-message {
+    animation: messageAppear 0.5s ease-out forwards;
+}
+
+/* Phase icon pulse */
+@keyframes iconPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+.phase-icon {
+    animation: iconPulse 2s ease-in-out infinite;
+}
+
+/* Error shake animation */
+@keyframes errorShake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+}
+
+.error-animation {
+    animation: errorShake 0.5s ease-in-out;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    .container {
+        padding: 1rem;
+    }
+    
+    h1 {
+        font-size: 1.8rem;
+    }
 } 
