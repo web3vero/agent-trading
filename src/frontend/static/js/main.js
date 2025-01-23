@@ -172,84 +172,23 @@ function updateResult(result) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('analyzeForm');
-    const submitButton = document.getElementById('submitButton');
+    const analyzeForm = document.getElementById('analyzeForm');
     const resultsContent = document.getElementById('resultsContent');
-    const loadingSpinner = document.getElementById('loadingSpinner');
-    const processingAnimation = document.getElementById('processingAnimation');
-    let pollingInterval;
+    const spinner = document.getElementById('spinner');
+    let pollInterval;
 
-    async function pollForResults() {
-        try {
-            const response = await fetch('/results');
-            const data = await response.json();
-            
-            console.log("🔍 Polling results:", data);
-            
-            if (data.status === 'success') {
-                if (data.results && data.results.length > 0) {
-                    resultsContent.innerHTML = ''; // Clear previous results
-                    
-                    data.results.forEach(result => {
-                        const resultHtml = `
-                            <div class="mb-8 p-4 bg-white rounded-lg shadow-md">
-                                <h3 class="text-lg font-semibold mb-2">Strategy ${result.strategy_number} ${result.status === 'success' ? '✅' : '❌'}</h3>
-                                ${result.status === 'success' ? `
-                                    <div class="mb-4">
-                                        <h4 class="font-medium mb-2">Strategy Analysis 📊</h4>
-                                        <pre class="bg-gray-100 p-4 rounded overflow-x-auto">${result.strategy}</pre>
-                                        <a href="/download/strategy/${result.strategy_file}" class="text-blue-500 hover:text-blue-700">Download Strategy</a>
-                                    </div>
-                                    <div>
-                                        <h4 class="font-medium mb-2">Backtest Implementation 🔬</h4>
-                                        <pre class="bg-gray-100 p-4 rounded overflow-x-auto">${result.backtest}</pre>
-                                        <a href="/download/backtest/${result.backtest_file}" class="text-blue-500 hover:text-blue-700">Download Backtest</a>
-                                    </div>
-                                ` : `
-                                    <div class="text-red-500">
-                                        Error: ${result.message}
-                                    </div>
-                                `}
-                            </div>
-                        `;
-                        resultsContent.innerHTML += resultHtml;
-                    });
-                }
-                
-                if (data.is_complete) {
-                    console.log("✅ Processing complete!");
-                    clearInterval(pollingInterval);
-                    loadingSpinner.classList.add('hidden');
-                    processingAnimation.classList.add('hidden');
-                }
-            } else {
-                console.error("❌ Error in results:", data);
-                resultsContent.innerHTML = `<div class="text-red-500">Error: ${data.message || 'An unexpected error occurred'}</div>`;
-                clearInterval(pollingInterval);
-                loadingSpinner.classList.add('hidden');
-                processingAnimation.classList.add('hidden');
-            }
-        } catch (error) {
-            console.error("❌ Error polling results:", error);
-            resultsContent.innerHTML = `<div class="text-red-500">Error: ${error.message}</div>`;
-            clearInterval(pollingInterval);
-            loadingSpinner.classList.add('hidden');
-            processingAnimation.classList.add('hidden');
-        }
-    }
-
-    form.addEventListener('submit', async function(e) {
+    analyzeForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         
-        // Clear previous results and show loading state
+        // Clear previous results and show spinner
         resultsContent.innerHTML = '';
-        loadingSpinner.classList.remove('hidden');
-        processingAnimation.classList.remove('hidden');
-        submitButton.disabled = true;
+        spinner.classList.remove('hidden');
+        
+        console.log("🌙 Starting form submission...");
         
         try {
-            console.log("🌙 Submitting form...");
-            const formData = new FormData(form);
+            const formData = new FormData(analyzeForm);
+            console.log("📤 Sending request to /analyze endpoint...");
             
             const response = await fetch('/analyze', {
                 method: 'POST',
@@ -257,29 +196,93 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             const data = await response.json();
-            console.log("📡 Response:", data);
+            console.log("📡 Received response:", data);
             
             if (data.status === 'success') {
                 console.log("✨ Starting polling for results...");
-                // Start polling for results every 5 seconds
-                pollingInterval = setInterval(pollForResults, 5000);
-                // Also poll immediately
-                await pollForResults();
+                startPolling();
             } else {
-                console.error("❌ Error:", data);
-                resultsContent.innerHTML = `<div class="text-red-500">Error: ${data.message || 'An unexpected error occurred'}</div>`;
-                loadingSpinner.classList.add('hidden');
-                processingAnimation.classList.add('hidden');
+                console.error("❌ Error in response:", data);
+                showError(data.message || "An unexpected error occurred");
             }
         } catch (error) {
             console.error("❌ Error:", error);
-            resultsContent.innerHTML = `<div class="text-red-500">Error: ${error.message}</div>`;
-            loadingSpinner.classList.add('hidden');
-            processingAnimation.classList.add('hidden');
-        } finally {
-            submitButton.disabled = false;
+            showError(`An unexpected error occurred: ${error.message}`);
         }
     });
+
+    function startPolling() {
+        console.log("🔄 Starting polling interval...");
+        if (pollInterval) clearInterval(pollInterval);
+        
+        pollInterval = setInterval(async () => {
+            try {
+                console.log("📡 Polling for results...");
+                const response = await fetch('/results');
+                const data = await response.json();
+                console.log("📥 Received polling data:", data);
+                
+                if (data.status === 'success' && Array.isArray(data.results)) {
+                    console.log(`✨ Processing ${data.results.length} results`);
+                    updateResults(data.results);
+                    
+                    if (data.is_complete) {
+                        console.log("✅ Processing complete, stopping polling");
+                        clearInterval(pollInterval);
+                        spinner.classList.add('hidden');
+                    }
+                } else {
+                    console.error("❌ Invalid results data:", data);
+                }
+            } catch (error) {
+                console.error("❌ Polling error:", error);
+                clearInterval(pollInterval);
+                spinner.classList.add('hidden');
+                showError(`Error fetching results: ${error.message}`);
+            }
+        }, 5000);
+    }
+
+    function updateResults(results) {
+        resultsContent.innerHTML = '';
+        
+        results.forEach(result => {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'mb-8 p-6 bg-white rounded-lg shadow-md';
+            
+            if (result.status === 'success') {
+                resultDiv.innerHTML = `
+                    <h3 class="text-xl font-bold mb-4">Strategy ${result.strategy_number} Analysis 🎯</h3>
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold mb-2">Strategy Analysis 📊</h4>
+                        <pre class="bg-gray-100 p-4 rounded overflow-x-auto">${result.strategy}</pre>
+                        <a href="/download/strategy/${result.strategy_file}" class="text-blue-500 hover:text-blue-700">Download Strategy</a>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-semibold mb-2">Backtest Implementation 🚀</h4>
+                        <pre class="bg-gray-100 p-4 rounded overflow-x-auto">${result.backtest}</pre>
+                        <a href="/download/backtest/${result.backtest_file}" class="text-blue-500 hover:text-blue-700">Download Backtest</a>
+                    </div>
+                `;
+            } else {
+                resultDiv.innerHTML = `
+                    <h3 class="text-xl font-bold mb-4">Strategy ${result.strategy_number} Error ❌</h3>
+                    <p class="text-red-500">${result.message}</p>
+                `;
+            }
+            
+            resultsContent.appendChild(resultDiv);
+        });
+    }
+
+    function showError(message) {
+        spinner.classList.add('hidden');
+        resultsContent.innerHTML = `
+            <div class="p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+                ❌ ${message}
+            </div>
+        `;
+    }
 });
 
 // Copy to clipboard function
