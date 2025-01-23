@@ -1,35 +1,28 @@
 from fastapi import FastAPI, Request, Form
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
 import uvicorn
 from pathlib import Path
 import sys
 import os
 import json
-import asyncio
 from dotenv import load_dotenv
 
 # Load environment variables
-if os.getenv("REPL_ID"):  # Check if running on Repl.it
-    # Repl.it secrets are automatically loaded into os.environ
-    print("🌙 Running on Repl.it - using secrets")
-else:
-    # Local development - load from .env
-    load_dotenv()
-    print("🌙 Running locally - using .env file")
+load_dotenv()
 
 # Verify required environment variables
 required_vars = [
     "DEEPSEEK_KEY",
-    # Add other required keys here
+    "PORT"  # Heroku provides PORT
 ]
 
 missing_vars = [var for var in required_vars if not os.getenv(var)]
 if missing_vars:
     print("❌ Missing required environment variables:", missing_vars)
-    print("Please set these in .env file (local) or Secrets (Repl.it)")
+    print("Please set these in your .env file or Heroku config vars")
     sys.exit(1)
 
 print("✅ All required environment variables found!")
@@ -199,14 +192,13 @@ async def download_backtest(filename: str):
     })
 
 if __name__ == "__main__":
-    # Create required directories if they don't exist
-    (FRONTEND_DIR / "static" / "css").mkdir(parents=True, exist_ok=True)
-    (FRONTEND_DIR / "static" / "js").mkdir(parents=True, exist_ok=True)
-    (FRONTEND_DIR / "static" / "images").mkdir(parents=True, exist_ok=True)
-    (FRONTEND_DIR / "templates").mkdir(parents=True, exist_ok=True)
+    # Get port from environment variable (Heroku sets this)
+    port = int(os.getenv("PORT", 8000))
     
-    print("🌙 Moon Dev's RBI Agent Frontend Starting...")
+    print("🌙 Moon Dev's RBI Agent Starting...")
     print(f"📁 Frontend Directory: {FRONTEND_DIR}")
     print(f"📁 Static Files: {FRONTEND_DIR / 'static'}")
     print(f"📁 Templates: {FRONTEND_DIR / 'templates'}")
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True) 
+    
+    # Start server with host 0.0.0.0 for Heroku
+    uvicorn.run("main:app", host="0.0.0.0", port=port) 
