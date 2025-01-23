@@ -67,50 +67,76 @@ async def home(request: Request):
 async def analyze_strategy(links: str = Form(...)):
     """Process trading strategy links"""
     try:
+        print("🌙 Starting strategy analysis...")
+        
+        # Create required directories
+        for dir_path in [
+            PROJECT_ROOT / "data",
+            PROJECT_ROOT / "data/rbi",
+            PROJECT_ROOT / "data/rbi/research",
+            PROJECT_ROOT / "data/rbi/backtests",
+            PROJECT_ROOT / "data/rbi/backtests_final"
+        ]:
+            dir_path.mkdir(parents=True, exist_ok=True)
+            print(f"📁 Ensuring directory exists: {dir_path}")
+        
         # Split links by newline or comma
         links_list = [link.strip() for link in links.replace('\n', ',').split(',') if link.strip()]
+        print(f"🔍 Processing {len(links_list)} links: {links_list}")
+        
         results = []
         
         for i, link in enumerate(links_list, 1):
-            print(f"🌙 Processing Strategy {i}: {link}")
-            
-            # Get the latest strategy and backtest files
-            strategy_dir = PROJECT_ROOT / "data/rbi/research"
-            backtest_dir = PROJECT_ROOT / "data/rbi/backtests_final"
-            
-            # Process the strategy
-            process_trading_idea(link)
-            
-            # Get the most recent files
-            strategy_files = sorted(strategy_dir.glob("strategy_*.txt"), key=lambda x: x.stat().st_mtime, reverse=True)
-            backtest_files = sorted(backtest_dir.glob("backtest_final_*.py"), key=lambda x: x.stat().st_mtime, reverse=True)
-            
-            if strategy_files and backtest_files:
-                # Read the strategy and backtest content
-                with open(strategy_files[0], 'r') as f:
-                    strategy_content = f.read()
-                with open(backtest_files[0], 'r') as f:
-                    backtest_content = f.read()
+            try:
+                print(f"🌙 Processing Strategy {i}: {link}")
                 
-                result = {
+                # Get the latest strategy and backtest files
+                strategy_dir = PROJECT_ROOT / "data/rbi/research"
+                backtest_dir = PROJECT_ROOT / "data/rbi/backtests_final"
+                
+                # Process the strategy
+                process_trading_idea(link)
+                
+                # Get the most recent files
+                strategy_files = sorted(strategy_dir.glob("strategy_*.txt"), key=lambda x: x.stat().st_mtime, reverse=True)
+                backtest_files = sorted(backtest_dir.glob("backtest_final_*.py"), key=lambda x: x.stat().st_mtime, reverse=True)
+                
+                if strategy_files and backtest_files:
+                    print(f"📄 Found files: {strategy_files[0].name}, {backtest_files[0].name}")
+                    # Read the strategy and backtest content
+                    with open(strategy_files[0], 'r') as f:
+                        strategy_content = f.read()
+                    with open(backtest_files[0], 'r') as f:
+                        backtest_content = f.read()
+                    
+                    result = {
+                        "strategy_number": i,
+                        "link": link,
+                        "strategy": strategy_content,
+                        "backtest": backtest_content,
+                        "strategy_file": str(strategy_files[0].name),
+                        "backtest_file": str(backtest_files[0].name),
+                        "status": "success"
+                    }
+                else:
+                    print(f"❌ No output files found for strategy {i}")
+                    result = {
+                        "strategy_number": i,
+                        "link": link,
+                        "error": "Strategy processing completed but couldn't find output files",
+                        "status": "error"
+                    }
+                
+                results.append(result)
+                print(f"🚀 Strategy {i} complete!")
+            except Exception as e:
+                print(f"❌ Error processing strategy {i}: {str(e)}")
+                results.append({
                     "strategy_number": i,
                     "link": link,
-                    "strategy": strategy_content,
-                    "backtest": backtest_content,
-                    "strategy_file": str(strategy_files[0].name),
-                    "backtest_file": str(backtest_files[0].name),
-                    "status": "success"
-                }
-            else:
-                result = {
-                    "strategy_number": i,
-                    "link": link,
-                    "error": "Strategy processing completed but couldn't find output files",
+                    "error": f"Error processing strategy: {str(e)}",
                     "status": "error"
-                }
-            
-            results.append(result)
-            print(f"🚀 Strategy {i} complete!")
+                })
             
         return JSONResponse({
             "status": "success",
@@ -118,10 +144,11 @@ async def analyze_strategy(links: str = Form(...)):
         })
             
     except Exception as e:
-        print(f"❌ Error in analyze endpoint: {str(e)}")
+        error_msg = f"❌ Error in analyze endpoint: {str(e)}"
+        print(error_msg)
         return JSONResponse({
             "status": "error",
-            "message": f"❌ Error: {str(e)}"
+            "message": error_msg
         })
 
 @app.get("/download/strategy/{filename}")
