@@ -198,11 +198,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: formData
             });
             
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const data = await response.json();
             console.log("📡 Received response:", data);
             
             if (data.status === 'success') {
                 console.log("✨ Starting processing phases...");
+                
+                // Show initial processing message
+                const processingMsg = document.createElement('div');
+                processingMsg.className = 'text-purple-400 mt-4 text-center';
+                processingMsg.innerHTML = '🔄 Processing your strategy... This may take a few minutes.';
+                resultsContent.appendChild(processingMsg);
+                
+                // Start polling for results
+                startPolling();
                 
                 // Start the processing phases
                 const researchPhase = document.getElementById('researchPhase');
@@ -212,17 +225,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Clear previous messages
                 document.querySelectorAll('.progress-messages').forEach(el => el.innerHTML = '');
                 
-                // Start polling for results immediately
-                startPolling();
-                
                 // Show processing phases with animations
                 await processPhase(researchPhase, researchMessages, PHASE_TIMINGS.research);
                 await processPhase(backtestPhase, backtestMessages, PHASE_TIMINGS.backtest);
                 await processPhase(debugPhase, debugMessages, PHASE_TIMINGS.debug);
+            } else {
+                throw new Error(data.message || 'Failed to start processing');
             }
         } catch (error) {
             console.error("❌ Error:", error);
-            // Don't show error immediately, let polling handle it
+            handlePollingError("Starting strategy processing...");
         }
     });
 
@@ -230,13 +242,11 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("🔄 Starting polling interval...");
         if (pollInterval) clearInterval(pollInterval);
         
-        // Poll every 3 seconds instead of 5
         pollInterval = setInterval(async () => {
             try {
                 console.log("📡 Polling for results...");
                 const response = await fetch('/results', {
-                    // Add timeout of 10 seconds for each request
-                    signal: AbortSignal.timeout(10000)
+                    signal: AbortSignal.timeout(8000)  // Reduced timeout to 8 seconds
                 });
                 
                 if (!response.ok) {
@@ -246,9 +256,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = await response.json();
                 console.log("📥 Received polling data:", data);
                 
-                if (data.status === 'success' && Array.isArray(data.results)) {
+                if (data.status === 'success' && Array.isArray(data.results) && data.results.length > 0) {
                     console.log(`✨ Processing ${data.results.length} results`);
                     retryCount = 0; // Reset retry count on successful response
+                    
+                    // Clear any existing processing messages
+                    const processingMsg = resultsContent.querySelector('.text-purple-400');
+                    if (processingMsg) {
+                        processingMsg.remove();
+                    }
                     
                     // Update results as they come in
                     data.results.forEach(result => {
@@ -261,15 +277,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         spinner.classList.add('hidden');
                     }
                 } else {
-                    console.warn("⚠️ Invalid results data:", data);
-                    handlePollingError("Still processing...");
+                    console.log("⏳ No results yet, continuing to poll...");
+                    handlePollingError("Still processing your strategy...");
                 }
             } catch (error) {
                 console.error("❌ Polling error:", error);
                 if (error.name === 'TimeoutError' || error.name === 'AbortError') {
-                    handlePollingError("Still processing your strategy... This may take a few minutes.");
+                    handlePollingError("Still working on your strategy... This may take a few minutes.");
                 } else {
-                    handlePollingError("Error fetching results. Will retry...");
+                    handlePollingError("Checking strategy progress...");
                 }
             }
         }, 3000);
@@ -279,23 +295,23 @@ document.addEventListener('DOMContentLoaded', function() {
         retryCount++;
         console.log(`🔄 Retry attempt ${retryCount}/${MAX_RETRIES}`);
         
-        // Show a more informative message in the UI
+        // Update or create status message
         const statusMessage = document.createElement('div');
         statusMessage.className = 'text-purple-400 mt-4 text-center';
         statusMessage.innerHTML = `${message} (Attempt ${retryCount}/${MAX_RETRIES})`;
         
-        // Only append if there isn't already a status message
         const existingStatus = resultsContent.querySelector('.text-purple-400');
-        if (!existingStatus) {
-            resultsContent.appendChild(statusMessage);
-        } else {
+        if (existingStatus) {
             existingStatus.innerHTML = statusMessage.innerHTML;
+        } else {
+            resultsContent.appendChild(statusMessage);
         }
         
+        // Only show error after max retries
         if (retryCount >= MAX_RETRIES) {
             clearInterval(pollInterval);
             spinner.classList.add('hidden');
-            showError("Strategy processing is taking longer than expected. Please check back in a few minutes - your results will be saved!");
+            showError("Strategy processing is still running in the background. Your results will be saved! Please check back in a few minutes.");
         }
     }
 
