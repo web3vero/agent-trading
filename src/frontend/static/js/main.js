@@ -199,8 +199,23 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log("📡 Received response:", data);
             
             if (data.status === 'success') {
-                console.log("✨ Starting polling for results...");
+                console.log("✨ Starting processing phases...");
+                
+                // Start the processing phases
+                const researchPhase = document.getElementById('researchPhase');
+                const backtestPhase = document.getElementById('backtestPhase');
+                const debugPhase = document.getElementById('debugPhase');
+                
+                // Clear previous messages
+                document.querySelectorAll('.progress-messages').forEach(el => el.innerHTML = '');
+                
+                // Start polling for results immediately
                 startPolling();
+                
+                // Show processing phases with animations
+                await processPhase(researchPhase, researchMessages, PHASE_TIMINGS.research);
+                await processPhase(backtestPhase, backtestMessages, PHASE_TIMINGS.backtest);
+                await processPhase(debugPhase, debugMessages, PHASE_TIMINGS.debug);
             } else {
                 console.error("❌ Error in response:", data);
                 showError(data.message || "An unexpected error occurred");
@@ -224,7 +239,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 if (data.status === 'success' && Array.isArray(data.results)) {
                     console.log(`✨ Processing ${data.results.length} results`);
-                    updateResults(data.results);
+                    
+                    // Update results as they come in
+                    data.results.forEach(result => {
+                        updateResult(result);
+                    });
                     
                     if (data.is_complete) {
                         console.log("✅ Processing complete, stopping polling");
@@ -241,38 +260,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 showError(`Error fetching results: ${error.message}`);
             }
         }, 5000);
-    }
-
-    function updateResults(results) {
-        resultsContent.innerHTML = '';
-        
-        results.forEach(result => {
-            const resultDiv = document.createElement('div');
-            resultDiv.className = 'mb-8 p-6 bg-white rounded-lg shadow-md';
-            
-            if (result.status === 'success') {
-                resultDiv.innerHTML = `
-                    <h3 class="text-xl font-bold mb-4">Strategy ${result.strategy_number} Analysis 🎯</h3>
-                    <div class="mb-6">
-                        <h4 class="text-lg font-semibold mb-2">Strategy Analysis 📊</h4>
-                        <pre class="bg-gray-100 p-4 rounded overflow-x-auto">${result.strategy}</pre>
-                        <a href="/download/strategy/${result.strategy_file}" class="text-blue-500 hover:text-blue-700">Download Strategy</a>
-                    </div>
-                    <div>
-                        <h4 class="text-lg font-semibold mb-2">Backtest Implementation 🚀</h4>
-                        <pre class="bg-gray-100 p-4 rounded overflow-x-auto">${result.backtest}</pre>
-                        <a href="/download/backtest/${result.backtest_file}" class="text-blue-500 hover:text-blue-700">Download Backtest</a>
-                    </div>
-                `;
-            } else {
-                resultDiv.innerHTML = `
-                    <h3 class="text-xl font-bold mb-4">Strategy ${result.strategy_number} Error ❌</h3>
-                    <p class="text-red-500">${result.message}</p>
-                `;
-            }
-            
-            resultsContent.appendChild(resultDiv);
-        });
     }
 
     function showError(message) {
