@@ -258,17 +258,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const links = formData.get('links');
             const numStrategies = links.split(/[\n,]/).filter(link => link.trim()).length;
             
-            // Start the phase animations
-            const researchPhase = document.getElementById('researchPhase');
-            const backtestPhase = document.getElementById('backtestPhase');
-            const debugPhase = document.getElementById('debugPhase');
-            
-            // Process each phase
-            await processPhase(researchPhase, researchMessages, PHASE_TIMINGS.research);
-            await processPhase(backtestPhase, backtestMessages, PHASE_TIMINGS.backtest);
-            await processPhase(debugPhase, debugMessages, PHASE_TIMINGS.debug);
-            
-            // Start actual processing
+            // Start actual processing first
             console.log("🌙 Sending request to /analyze endpoint...");
             const response = await fetch('/analyze', {
                 method: 'POST',
@@ -279,10 +269,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             console.log("🔍 Response data:", data);
             
-            // Show results section
-            results.classList.remove('hidden');
-            
             if (data.status === 'success') {
+                // Start the phase animations
+                const researchPhase = document.getElementById('researchPhase');
+                const backtestPhase = document.getElementById('backtestPhase');
+                const debugPhase = document.getElementById('debugPhase');
+                
+                // Process each phase
+                await processPhase(researchPhase, researchMessages, PHASE_TIMINGS.research);
+                await processPhase(backtestPhase, backtestMessages, PHASE_TIMINGS.backtest);
+                await processPhase(debugPhase, debugMessages, PHASE_TIMINGS.debug);
+                
+                // Show results section
+                results.classList.remove('hidden');
+                
                 // Start polling for results
                 const pollInterval = setInterval(async () => {
                     try {
