@@ -351,63 +351,58 @@ def debug_backtest(backtest_code, strategy=None):
         return output
     return None
 
-def process_trading_idea(idea):
-    """Process a single trading idea through the RBI pipeline"""
-    cprint("\n🚀 Moon Dev's RBI Agent Processing New Idea!", "cyan")
-    cprint("🌟 Let's find some alpha in the chaos!", "yellow")
+def process_trading_idea(link: str) -> None:
+    """Process a trading idea by detecting type and extracting content"""
+    print("\n🚀 Moon Dev's RBI Agent Processing New Idea!")
+    print("🌟 Let's find some alpha in the chaos!")
     
-    # Extract content based on type
-    if "youtube.com" in idea or "youtu.be" in idea:
-        cprint("📺 YouTube strategy detected! Let's see what we can learn...", "cyan")
-        video_id = re.search(r"(?:v=|\/)([a-zA-Z0-9_-]{11})(?:\?|$|&)", idea).group(1)
-        content = get_youtube_transcript(video_id)
-    elif idea.endswith('.pdf'):
-        cprint("📚 PDF detected! Time to extract some knowledge...", "cyan")
-        content = get_pdf_text(idea)
-    else:
-        cprint("💭 Processing raw strategy idea...", "cyan")
-        content = idea
+    try:
+        # Create output directories if they don't exist
+        data_dir = Path("data/rbi")
+        research_dir = data_dir / "research"
+        backtest_dir = data_dir / "backtests"
+        backtest_final_dir = data_dir / "backtests_final"
         
-    if not content:
-        cprint("❌ Failed to extract content", "red")
-        return
+        for dir in [data_dir, research_dir, backtest_dir, backtest_final_dir]:
+            dir.mkdir(parents=True, exist_ok=True)
+            
+        print("💭 Processing raw strategy idea...")
         
-    # Research Agent
-    cprint("\n🧪 Phase 1: Research", "yellow")
-    strategy = research_strategy(content)
-    if not strategy:
-        cprint("❌ Research phase failed", "red")
-        return
+        # Phase 1: Research
+        print("\n🧪 Phase 1: Research")
+        strategy = research_strategy(link)
         
-    # Backtest Agent
-    cprint("\n📈 Phase 2: Backtest", "yellow")
-    backtest = create_backtest(strategy)
-    if not backtest:
-        cprint("❌ Backtest phase failed", "red")
-        return
-        
-    # Debug Agent
-    cprint("\n🔧 Phase 3: Debug", "yellow")
-    debugged_backtest = debug_backtest(backtest, strategy)
-    if debugged_backtest:
+        # Save strategy to file with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filepath = FINAL_BACKTEST_DIR / f"backtest_final_{get_model_id(DEBUG_MODEL)}_{timestamp}.py"
-        with open(filepath, 'w') as f:
-            f.write(debugged_backtest)
-        cprint(f"✨ Debug Agent made it shine! Final code saved to {filepath} 💎", "green")
-        
-        # Save the strategy with matching timestamp
-        strategy_filepath = RESEARCH_DIR / f"strategy_{get_model_id(RESEARCH_MODEL)}_{timestamp}.txt"
-        with open(strategy_filepath, 'w') as f:
+        strategy_file = research_dir / f"strategy_DC_{timestamp}.txt"
+        with open(strategy_file, "w") as f:
             f.write(strategy)
-        cprint(f"📝 Strategy saved to {strategy_filepath}", "green")
-    else:
-        cprint("❌ Debug phase failed", "red")
-        return
-    
-    cprint("\n🎉 Mission Accomplished! All agents completed successfully!", "green")
-    cprint("🚀 Ready to make it rain! 💸", "cyan")
-    return True
+        print(f"\n📝 Strategy saved to {strategy_file}")
+        
+        # Phase 2: Backtest
+        print("\n📈 Phase 2: Backtest")
+        backtest = create_backtest(strategy)
+        
+        # Save initial backtest
+        backtest_file = backtest_dir / f"backtest_DC_{timestamp}.py"
+        with open(backtest_file, "w") as f:
+            f.write(backtest)
+            
+        # Phase 3: Debug
+        print("\n🔧 Phase 3: Debug")
+        final_backtest = debug_backtest(backtest)
+        
+        # Save final backtest
+        final_backtest_file = backtest_final_dir / f"backtest_final_DC_{timestamp}.py"
+        with open(final_backtest_file, "w") as f:
+            f.write(final_backtest)
+            
+        print("\n🎉 Mission Accomplished! All agents completed successfully!")
+        print("🚀 Ready to make it rain! 💸")
+        
+    except Exception as e:
+        print(f"\n❌ Error processing trading idea: {str(e)}")
+        raise
 
 def debug_existing_backtests():
     """Debug all existing backtests in the backtests directory"""
