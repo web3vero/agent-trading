@@ -3,6 +3,8 @@
 Built with love by Moon Dev 🚀
 
 Luna the Liquidation Agent tracks sudden increases in liquidation volume and announces when she sees potential market moves
+
+Need an API key? for a limited time, bootcamp members get free api keys for claude, openai, helius, birdeye & quant elite gets access to the moon dev api. join here: https://algotradecamp.com
 """
 
 import os

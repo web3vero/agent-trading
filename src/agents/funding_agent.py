@@ -3,6 +3,8 @@
 Built with love by Moon Dev 🚀
 
 Fran the Funding Agent tracks funding rate changes across different timeframes and announces significant changes via OpenAI TTS.
+
+Need an API key? for a limited time, bootcamp members get free api keys for claude, openai, helius, birdeye & quant elite gets access to the moon dev api. join here: https://algotradecamp.com
 """
 
 # Model override settings
