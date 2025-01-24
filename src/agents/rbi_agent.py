@@ -147,9 +147,9 @@ import sys
 # DeepSeek Configuration
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 
-# Use existing data directories
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-DATA_DIR = PROJECT_ROOT / "src/data/rbi"
+# Update data directory paths
+PROJECT_ROOT = Path(__file__).parent.parent  # Points to src/
+DATA_DIR = PROJECT_ROOT / "data/rbi"
 RESEARCH_DIR = DATA_DIR / "research"
 BACKTEST_DIR = DATA_DIR / "backtests"
 FINAL_BACKTEST_DIR = DATA_DIR / "backtests_final"
@@ -360,12 +360,7 @@ def process_trading_idea(link: str) -> None:
     
     try:
         # Create output directories if they don't exist
-        data_dir = Path("data/rbi")
-        research_dir = data_dir / "research"
-        backtest_dir = data_dir / "backtests"
-        backtest_final_dir = data_dir / "backtests_final"
-        
-        for dir in [data_dir, research_dir, backtest_dir, backtest_final_dir]:
+        for dir in [DATA_DIR, RESEARCH_DIR, BACKTEST_DIR, FINAL_BACKTEST_DIR]:
             dir.mkdir(parents=True, exist_ok=True)
             
         print("💭 Processing raw strategy idea...")
@@ -376,7 +371,7 @@ def process_trading_idea(link: str) -> None:
         
         # Save strategy to file with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        strategy_file = research_dir / f"strategy_DC_{timestamp}.txt"
+        strategy_file = RESEARCH_DIR / f"strategy_DC_{timestamp}.txt"
         with open(strategy_file, "w") as f:
             f.write(strategy)
         print(f"\n📝 Strategy saved to {strategy_file}")
@@ -386,7 +381,7 @@ def process_trading_idea(link: str) -> None:
         backtest = create_backtest(strategy)
         
         # Save initial backtest
-        backtest_file = backtest_dir / f"backtest_DC_{timestamp}.py"
+        backtest_file = BACKTEST_DIR / f"backtest_DC_{timestamp}.py"
         with open(backtest_file, "w") as f:
             f.write(backtest)
             
@@ -395,7 +390,7 @@ def process_trading_idea(link: str) -> None:
         final_backtest = debug_backtest(backtest)
         
         # Save final backtest
-        final_backtest_file = backtest_final_dir / f"backtest_final_DC_{timestamp}.py"
+        final_backtest_file = FINAL_BACKTEST_DIR / f"backtest_final_DC_{timestamp}.py"
         with open(final_backtest_file, "w") as f:
             f.write(final_backtest)
             
@@ -442,7 +437,7 @@ def debug_existing_backtests():
 
 def main():
     """Main function to process ideas from file"""
-    ideas_file = Path("src/data/rbi/ideas.txt")
+    ideas_file = DATA_DIR / "ideas.txt"
     
     if not ideas_file.exists():
         cprint("❌ ideas.txt not found! Creating template...", "red")
