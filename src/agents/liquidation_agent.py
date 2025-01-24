@@ -125,7 +125,7 @@ class LiquidationAgent(BaseAgent):
         self.load_history()
         
         print("🌊 Luna the Liquidation Agent initialized!")
-        print(f"🎯 Alerting on liquidation increases above {(LIQUIDATION_THRESHOLD-1)*100:.0f}%")
+        print(f"🎯 Alerting on liquidation increases above +{LIQUIDATION_THRESHOLD*100:.0f}% from previous")
         print(f"📊 Analyzing last {LIQUIDATION_ROWS} liquidation events")
         print(f"📈 Using {LOOKBACK_BARS} {TIMEFRAME} candles for market context")
         
@@ -383,10 +383,16 @@ class LiquidationAgent(BaseAgent):
                     liq_type = "SHORT"
                     pct_change = analysis['pct_change_shorts']
                 
+                # Format the percentage change message
+                if pct_change > 0:
+                    change_msg = f"up {abs(pct_change):.1f}%"
+                else:
+                    change_msg = f"down {abs(pct_change):.1f}%"
+                
                 message = (
                     f"ayo moon dev seven seven seven! "
                     f"Massive {liq_type} liquidations detected! "
-                    f"Up {pct_change:.1f}% in the last period! "
+                    f"{change_msg} in the last period! "
                     f"AI suggests {analysis['action']} with {analysis['confidence']}% confidence 🌙"
                 )
                 return message
@@ -473,8 +479,10 @@ class LiquidationAgent(BaseAgent):
                     # Only trigger if we have valid previous data
                     if previous_longs > 0 and previous_shorts > 0:
                         # Check if we have a significant increase in either longs or shorts
-                        if (current_longs > (previous_longs * LIQUIDATION_THRESHOLD) or 
-                            current_shorts > (previous_shorts * LIQUIDATION_THRESHOLD)):
+                        # Adding 1 to threshold so 0.5 means 150% of previous value
+                        threshold = 1 + LIQUIDATION_THRESHOLD
+                        if (current_longs > (previous_longs * threshold) or 
+                            current_shorts > (previous_shorts * threshold)):
                             # Get AI analysis
                             analysis = self._analyze_opportunity(current_longs, current_shorts, 
                                                               previous_longs, previous_shorts)
