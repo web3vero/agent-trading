@@ -116,6 +116,16 @@ BACKTEST EXECUTION ORDER:
 4. Then run optimization
 5. Show optimized results and final plot
 
+CHART OUTPUT:
+1. Import os at the top of the file
+2. Save charts to the charts directory:
+   ```python
+   # Save plots to charts directory
+   chart_file = os.path.join("/Users/md/Dropbox/dev/github/moon-dev-ai-agents-for-trading/src/data/rbi/charts", f"{strategy_name}_chart.html")
+   bt.plot(filename=chart_file, open_browser=False)
+   ```
+3. Do this for both initial and optimized plots
+
 RISK MANAGEMENT:
 1. Always calculate position sizes based on risk percentage
 2. Use proper stop loss and take profit calculations
@@ -219,9 +229,10 @@ RESEARCH_DIR = DATA_DIR / "research"
 BACKTEST_DIR = DATA_DIR / "backtests"
 PACKAGE_DIR = DATA_DIR / "backtests_package"
 FINAL_BACKTEST_DIR = DATA_DIR / "backtests_final"
+CHARTS_DIR = DATA_DIR / "charts"  # New directory for HTML charts
 
 # Create main directories if they don't exist
-for dir in [DATA_DIR, RESEARCH_DIR, BACKTEST_DIR, PACKAGE_DIR, FINAL_BACKTEST_DIR]:
+for dir in [DATA_DIR, RESEARCH_DIR, BACKTEST_DIR, PACKAGE_DIR, FINAL_BACKTEST_DIR, CHARTS_DIR]:
     dir.mkdir(parents=True, exist_ok=True)
 
 print(f"📂 Using RBI data directory: {DATA_DIR}")
@@ -229,6 +240,7 @@ print(f"📂 Research directory: {RESEARCH_DIR}")
 print(f"📂 Backtest directory: {BACKTEST_DIR}")
 print(f"📂 Package directory: {PACKAGE_DIR}")
 print(f"📂 Final backtest directory: {FINAL_BACKTEST_DIR}")
+print(f"📈 Charts directory: {CHARTS_DIR}")
 
 def init_deepseek_client():
     """Initialize DeepSeek client with proper error handling"""
