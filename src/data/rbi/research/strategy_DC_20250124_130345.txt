@@ -1,0 +1,53 @@
+### Strategy Instructions for Backtesting
+
+#### 1. **Key Strategy Components**
+   - **Trend Identification**: Use a combination of moving averages to identify the overall market trend.
+   - **Momentum Confirmation**: Utilize the Relative Strength Index (RSI) to confirm momentum before entering a trade.
+   - **Volatility Filter**: Apply the Average True Range (ATR) to filter out low-volatility conditions that may lead to false signals.
+
+#### 2. **Entry Rules**
+   - **Long Entry**:
+     - The 50-period Simple Moving Average (SMA) must be above the 200-period SMA, indicating an uptrend.
+     - RSI must be above 50 but below 70, indicating bullish momentum without being overbought.
+     - The current price must be above the 50-period SMA.
+     - The ATR must be above a predefined threshold (e.g., 1.5 times the 14-period ATR average) to ensure sufficient volatility.
+   - **Short Entry**:
+     - The 50-period SMA must be below the 200-period SMA, indicating a downtrend.
+     - RSI must be below 50 but above 30, indicating bearish momentum without being oversold.
+     - The current price must be below the 50-period SMA.
+     - The ATR must be above the same predefined threshold as in the long entry.
+
+#### 3. **Exit Rules**
+   - **Take Profit**:
+     - For long positions, set the take profit at 2 times the ATR value above the entry price.
+     - For short positions, set the take profit at 2 times the ATR value below the entry price.
+   - **Stop Loss**:
+     - For long positions, set the stop loss at 1 times the ATR value below the entry price.
+     - For short positions, set the stop loss at 1 times the ATR value above the entry price.
+   - **Trailing Stop**:
+     - Use a trailing stop of 0.5 times the ATR value to lock in profits as the trade moves in your favor.
+
+#### 4. **Risk Management**
+   - **Position Sizing**:
+     - Risk no more than 1% of the total account balance on any single trade.
+     - Calculate the position size based on the distance between the entry price and the stop loss level.
+   - **Maximum Drawdown**:
+     - Set a maximum drawdown limit of 5% of the account balance. If this limit is reached, stop trading for the day.
+   - **Diversification**:
+     - Do not allocate more than 20% of the account balance to a single asset or market.
+
+#### 5. **Required Indicators**
+   - **Simple Moving Averages (SMA)**:
+     - 50-period SMA
+     - 200-period SMA
+   - **Relative Strength Index (RSI)**:
+     - 14-period RSI
+   - **Average True Range (ATR)**:
+     - 14-period ATR
+
+#### 6. **Additional Notes**
+   - **Timeframe**: This strategy is optimized for the 1-hour (H1) chart but can be tested on other timeframes.
+   - **Backtesting Period**: Use at least 2 years of historical data to ensure robustness.
+   - **Slippage and Fees**: Account for a 0.1% slippage and trading fees in the backtest to simulate real-world conditions.
+
+These instructions should provide a clear framework for backtesting the strategy.

@@ -1,0 +1,59 @@
+### Strategy Instructions for Backtesting
+
+#### 1. **Key Strategy Components**
+   - **Timeframe**: Use a 15-minute chart for intraday trading.
+   - **Market**: Focus on highly liquid assets (e.g., major forex pairs, indices, or large-cap stocks).
+   - **Objective**: Capture short-term price movements using a combination of trend-following and momentum indicators.
+
+#### 2. **Entry Rules**
+   - **Trend Confirmation**:
+     - Use the **200-period Exponential Moving Average (EMA)** to determine the overall trend.
+       - **Long Entry**: Price must be above the 200 EMA.
+       - **Short Entry**: Price must be below the 200 EMA.
+   - **Momentum Confirmation**:
+     - Use the **Relative Strength Index (RSI)** (14-period) to confirm momentum.
+       - **Long Entry**: RSI must be above 50 and rising.
+       - **Short Entry**: RSI must be below 50 and falling.
+   - **Candlestick Pattern**:
+     - Look for a bullish engulfing pattern for long entries or a bearish engulfing pattern for short entries.
+   - **Volume Confirmation**:
+     - Ensure volume is above the 20-period average volume for the entry candle.
+
+#### 3. **Exit Rules**
+   - **Take Profit**:
+     - Set a fixed take profit at 1.5 times the Average True Range (ATR) (14-period) from the entry price.
+   - **Stop Loss**:
+     - Place a stop loss at 1 times the ATR (14-period) from the entry price.
+   - **Trailing Stop**:
+     - Use a trailing stop of 0.5 times the ATR (14-period) once the price moves in your favor by 1 ATR.
+   - **Time-Based Exit**:
+     - Exit the trade if the target or stop loss is not hit within 4 hours of entry.
+
+#### 4. **Risk Management**
+   - **Position Sizing**:
+     - Risk no more than 1% of your trading capital on any single trade.
+     - Calculate position size based on the distance between entry price and stop loss.
+   - **Maximum Daily Loss**:
+     - Stop trading for the day if you incur a 3% loss of your total account balance.
+   - **Maximum Daily Trades**:
+     - Limit yourself to 5 trades per day to avoid overtrading.
+
+#### 5. **Required Indicators**
+   - **200-period Exponential Moving Average (EMA)**:
+     - Used to identify the overall trend.
+   - **Relative Strength Index (RSI) (14-period)**:
+     - Used to confirm momentum and overbought/oversold conditions.
+   - **Average True Range (ATR) (14-period)**:
+     - Used to set stop loss, take profit, and trailing stop levels.
+   - **Volume Indicator**:
+     - Used to confirm entry signals with above-average volume.
+
+#### 6. **Backtesting Parameters**
+   - **Data Range**: Use at least 6 months of historical data.
+   - **Slippage**: Assume 0.1% slippage per trade.
+   - **Commission**: Include a $5 commission per trade (if applicable).
+   - **Initial Capital**: Start with $10,000 for simulation purposes.
+
+#### 7. **Additional Notes**
+   - Ensure the strategy is tested across different market conditions (trending, ranging, volatile, and low-volatility periods).
+   - Record and analyze win rate, average profit/loss per trade, and drawdowns during backtesting.
