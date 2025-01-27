@@ -23,11 +23,14 @@ import math
 USE_TEXT_FILE = True  # Whether to use input text file by default
 INPUT_TEXT_FILE = "/Users/md/Dropbox/dev/github/moon-dev-ai-agents-for-trading/src/data/tweets/generated_tweets_20250127_090040.txt"
 
+# Processing Settings
+PLAY_AUDIO = False  # Whether to play audio after generation (slower if True)
+DELAY_BETWEEN_REQUESTS = 1  # Seconds to wait between API calls
+
 # Audio Settings
 VOICE_ID = "Q1lWKMtcxmb76WQDCHTX"  # Default voice ID
 MODEL_ID = "eleven_multilingual_v2"  # Default model
 OUTPUT_FORMAT = "mp3_44100_128"  # High quality audio
-DELAY_BETWEEN_REQUESTS = 1  # Seconds to wait between API calls
 
 # Video Settings
 RAW_VIDS_DIR = Path("/Users/md/Dropbox/dev/github/moon-dev-ai-agents-for-trading/src/data/videos/raw_vids")
@@ -175,7 +178,7 @@ class VideoAgent:
             print(f"❌ Error combining audio and video: {str(e)}")
             raise
     
-    def generate_audio(self, text=None, play_audio=False):
+    def generate_audio(self, text=None):
         """Generate audio files from text input and combine with random videos"""
         try:
             # Get input text lines
@@ -226,8 +229,8 @@ class VideoAgent:
                     final_video = self._combine_audio_video(audio_filepath, video_file, line)
                     print(f"🎞️ Created final video: {final_video.name}")
                     
-                    # Play audio if requested
-                    if play_audio:
+                    # Play audio if enabled
+                    if PLAY_AUDIO:
                         print("🔊 Playing audio...")
                         elevenlabs.play(audio)
                     
@@ -255,4 +258,4 @@ if __name__ == "__main__":
     test_text = "Moon Dev's AI agents are revolutionizing trading with deep seek integration."
     
     # If USE_TEXT_FILE is True, it will use the file instead of test_text
-    agent.generate_audio(test_text, play_audio=True)
+    agent.generate_audio(test_text)

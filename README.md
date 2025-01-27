@@ -147,6 +147,8 @@ Project updates will be posted in discord, join here: [moondev.com](http://moond
 
 ## 🚀 Quick Start Guide
 
+python 3.10.9 is what was used during dev
+
 1. ⭐ **Star the Repo**
    - Click the star button to save it to your GitHub favorites
 
