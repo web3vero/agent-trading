@@ -3,6 +3,10 @@
 Built with love by Moon Dev 🚀
 
 This agent converts text to speech and combines it with background videos.
+
+future ideas
+- be descriptive with the broll video names in /raw_vids and later, the ai can match names with topics
+
 """
 
 import os
@@ -17,7 +21,7 @@ import math
 
 # Text Input Settings
 USE_TEXT_FILE = True  # Whether to use input text file by default
-INPUT_TEXT_FILE = "/Users/md/Dropbox/dev/github/moon-dev-ai-agents-for-trading/src/data/tweets/generated_tweets_20250127_085138.txt"
+INPUT_TEXT_FILE = "/Users/md/Dropbox/dev/github/moon-dev-ai-agents-for-trading/src/data/tweets/generated_tweets_20250127_090040.txt"
 
 # Audio Settings
 VOICE_ID = "Q1lWKMtcxmb76WQDCHTX"  # Default voice ID
