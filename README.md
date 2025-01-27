@@ -82,6 +82,7 @@ Project updates will be posted in discord, join here: [moondev.com](http://moond
 - rbi agent (`rbi_agent.py`): uses deepseek to research trading strategies based on the youtube video, pdf, or words you give it. then sends to his ai friend who codes out the backtest.
 - twitter agent (`tweet_agent.py`): takes in text and creates tweets using deepseek or other models
 - video agent (`video_agent.py`): takes in text to create videos by creating audio snippets using elevenlabs and combining with raw_video footage
+- new or top tokens (`new_or_top_agent.py`): an agent that looks at the new tokens and the top tokens from coin gecko api
 
 ## 🚀 Project Progress & Roadmap
 ### Phase 1: Foundation & Basic Trading ✅
