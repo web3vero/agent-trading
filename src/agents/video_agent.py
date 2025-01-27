@@ -118,7 +118,7 @@ class VideoAgent:
         return self._sanitize_filename('_'.join(words))
     
     def _combine_audio_video(self, audio_file, video_file, text):
-        """Combine audio and video files using ffmpeg"""
+        """Combine audio and video files using ffmpeg with precise duration matching"""
         # Create filename from first five words of text
         video_name = self._get_first_five_words(text)
         output_file = self.final_vids_dir / f"{video_name}.mp4"
@@ -134,13 +134,26 @@ class VideoAgent:
                   'default=noprint_wrappers=1:nokey=1', str(audio_file)]
             audio_duration = float(subprocess.check_output(cmd).decode().strip())
             
-            # If video is shorter than audio, loop it
+            # If video is shorter than audio, create precise loop
             if video_duration < audio_duration:
-                loop_count = math.ceil(audio_duration / video_duration)
                 temp_file = self.final_vids_dir / "temp_loop.mp4"
                 
-                # Create filter complex for seamless loop
-                filter_complex = f"[0:v]loop={loop_count}:1:0[v]"
+                # Calculate number of full loops needed and remaining time
+                full_loops = math.floor(audio_duration / video_duration)
+                remaining_time = audio_duration % video_duration
+                
+                if remaining_time > 0:
+                    # Create filter complex for precise loop + remaining portion
+                    filter_complex = (
+                        f"[0:v]loop={full_loops}:1:0[full];"  # Full loops
+                        f"[0:v]trim=0:{remaining_time}[part];"  # Remaining portion
+                        "[full][part]concat=n=2:v=1:a=0[v]"  # Concatenate them
+                    )
+                else:
+                    # Just loop the exact number of times needed
+                    filter_complex = f"[0:v]loop={full_loops-1}:1:0[v]"
+                
+                print(f"🎬 Creating precise loop: {full_loops} full + {remaining_time:.2f}s")
                 
                 cmd = [
                     'ffmpeg', '-y',
@@ -178,6 +191,12 @@ class VideoAgent:
             print(f"❌ Error combining audio and video: {str(e)}")
             raise
     
+    def _video_exists(self, text):
+        """Check if a video with these first five words already exists"""
+        video_name = self._get_first_five_words(text)
+        expected_path = self.final_vids_dir / f"{video_name}.mp4"
+        return expected_path.exists()
+    
     def generate_audio(self, text=None):
         """Generate audio files from text input and combine with random videos"""
         try:
@@ -201,6 +220,12 @@ class VideoAgent:
                     # Skip very short lines or likely headers
                     if len(line) < 10 or line.endswith(':'):
                         print("⏩ Skipping short line or header")
+                        continue
+                    
+                    # Check if video already exists
+                    if self._video_exists(line):
+                        video_name = self._get_first_five_words(line)
+                        print(f"🔄 Skipping duplicate video: {video_name}.mp4")
                         continue
                         
                     # Generate audio using simpler API
