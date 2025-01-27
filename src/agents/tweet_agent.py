@@ -11,7 +11,7 @@ This agent takes text input and generates tweets based on the content.
 # - "deepseek-chat" (DeepSeek's V3 model - fast & efficient)
 # - "deepseek-reasoner" (DeepSeek's R1 reasoning model)
 # - "0" (Use config.py's AI_MODEL setting)
-MODEL_OVERRIDE = "0"  # Set to "0" to disable override
+MODEL_OVERRIDE = "deepseek-chat"  # Set to "0" to disable override
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"  # Base URL for DeepSeek API
 
 # Text Processing Settings
