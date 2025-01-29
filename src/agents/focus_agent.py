@@ -5,8 +5,17 @@ Built with love by Moon Dev 🚀
 This agent randomly monitors speech samples and provides focus assessments.
 """
 
+# Use local DeepSeek flag
+# available free while moon dev is streaming: https://www.youtube.com/@moondevonyt 
+USE_LOCAL_DEEPSEEK = False  
 
-
+import sys
+from pathlib import Path
+# Add project root to Python path for imports
+project_root = str(Path(__file__).parent.parent.parent)
+if project_root not in sys.path:
+    sys.path.append(project_root)
+from src.scripts.deepseek_local_call import LAMBDA_IP  # Import IP using absolute path since we added project root to sys.path
 
 # System prompt for focus analysis
 FOCUS_PROMPT = """
@@ -55,7 +64,7 @@ from src.config import *
 # Configuration
 MIN_INTERVAL_MINUTES = 4
 MAX_INTERVAL_MINUTES = 11
-RECORDING_DURATION = 30  # seconds
+RECORDING_DURATION = 20  # seconds
 FOCUS_THRESHOLD = 8  # Minimum acceptable focus score
 AUDIO_CHUNK_SIZE = 2048
 SAMPLE_RATE = 16000
@@ -84,6 +93,16 @@ class FocusAgent:
         if not openai_key:
             raise ValueError("🚨 OPENAI_KEY not found in environment variables!")
         self.openai_client = openai.OpenAI(api_key=openai_key)
+        
+        # Initialize local DeepSeek client if enabled
+        if USE_LOCAL_DEEPSEEK:
+            self.local_deepseek = openai.OpenAI(
+                api_key="not-needed",
+                base_url=f"http://{LAMBDA_IP}:8000/v1"
+            )
+            cprint("🚀 Moon Dev's Focus Agent using Local DeepSeek!", "green")
+        else:
+            self.local_deepseek = None
         
         # Initialize Anthropic for Claude models
         anthropic_key = os.getenv("ANTHROPIC_KEY")
@@ -236,8 +255,57 @@ class FocusAgent:
     def analyze_focus(self, transcript):
         """Analyze focus level from transcript"""
         try:
-            # Use either DeepSeek or Claude
-            if "deepseek" in self.active_model.lower():
+            # Check if using local DeepSeek first
+            if USE_LOCAL_DEEPSEEK:
+                cprint("🤖 Using Local DeepSeek model", "cyan")
+                # For local DeepSeek, we need to be more explicit about the format
+                local_prompt = f"""You are Moon Dev's Focus AI Agent. Your task is to analyze the following transcript and respond in EXACTLY this format, with NO additional text:
+
+8/10
+"Your motivational quote or sentence here"
+
+DO NOT include any other text, tags, or formatting. Just those two lines.
+
+Analyze this transcript and rate focus from 1-10 (10 being completely focused):
+- Coding discussion = high focus (8-10)
+- Trading analysis = high focus (8-10)
+- Random chat/topics = low focus (1-4)
+- Non-work discussion = low focus (1-4)
+
+BE VERY STRICT WITH THE RATING.
+
+Here is the transcript to analyze:
+{transcript}"""
+
+                response = self.local_deepseek.chat.completions.create(
+                    model="deepseek-r1",
+                    messages=[
+                        {"role": "system", "content": "You are a strict focus analysis AI. Respond in the exact format specified."},
+                        {"role": "user", "content": local_prompt}
+                    ],
+                    stream=False
+                )
+                raw_analysis = response.choices[0].message.content.strip()
+                
+                # Print raw response for debugging
+                cprint(f"\n📝 Raw model response:\n{raw_analysis}", "magenta")
+                
+                # Extract just the final response after any <think> tags
+                # Split on </think> and take the last part if it exists
+                if "</think>" in raw_analysis:
+                    analysis = raw_analysis.split("</think>")[-1].strip()
+                else:
+                    # If no think tags, look for the last occurrence of X/10 pattern
+                    lines = raw_analysis.split('\n')
+                    for i in range(len(lines)-1, -1, -1):
+                        if '/10' in lines[i]:
+                            analysis = '\n'.join(lines[i:i+2])
+                            break
+                    else:
+                        analysis = raw_analysis  # Fallback to full response if no pattern found
+                
+            # Otherwise use either DeepSeek API or Claude
+            elif "deepseek" in self.active_model.lower():
                 if not self.deepseek_client:
                     raise ValueError("🚨 DeepSeek client not initialized - check DEEPSEEK_KEY")
                 client = self.deepseek_client
@@ -256,7 +324,7 @@ class FocusAgent:
                     stream=False
                 )
                 analysis = response.choices[0].message.content.strip()
-                
+            
             else:
                 # Use Claude with Anthropic client
                 cprint(f"🤖 Using Claude model: {self.active_model}", "cyan")

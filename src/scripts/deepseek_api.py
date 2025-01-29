@@ -4,6 +4,11 @@ THERE IS ANOTHER FILE CALLED DEEPSEEK_LOCAL_CALL.PY THAT IS HOW TO CALL IT FROM 
 WHILE I STREAM I WILL LIKELY HAVE THIS API RUNNING ON LAMBDA LABS SO EVERYONE CAN USE IT
 THE IP WILL CHANGE DAILY, CHECK DISCORD TO KNOW WHEN IT CHANGES: https://algotradecamp.com
 
+
+# available free while moon dev is streaming: https://www.youtube.com/@moondevonyt 
+
+
+
 Running DeepSeek-R1 70B using Ollama#
 Introduction#
 This short tutorial teaches how to use a Lambda Cloud on-demand instance to run the DeepSeek-R1 70B model using Ollama in a Docker container. Since NVIDIA Container Toolkit is preinstalled as part of Lambda Stack on all on-demand instances, Docker containers can use the GPUs without any additional configuration.
