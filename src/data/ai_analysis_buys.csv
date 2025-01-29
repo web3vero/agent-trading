@@ -1,4 +1,5 @@
 timestamp,token_id,symbol,name,volume_24h,market_cap,agent_one_recommendation,agent_two_recommendation,price,agent_one_analysis,agent_two_analysis,coingecko_url
+2025-01-28T08:27:52.682900,real-world-ai,RWA,Real World AI,1350132.0,5303418.0,BUY,BUY,0.00570261,,,https://www.coingecko.com/en/coins/real-world-ai
 2025-01-27T18:14:04.990803,simsai,simsai,SimsAI,196910.0,4085880.0,BUY,DO NOTHING,0.00408588,,,https://www.coingecko.com/en/coins/simsai
 2025-01-27T13:22:10.861694,gofundmeme,gfm,GoFundMeme,23898356.0,0.0,BUY,BUY,0.0404543,,,https://www.coingecko.com/en/coins/gofundmeme
 2025-01-27T13:19:19.509273,stupidcoin-2,stupid,StupidCoin,167388331.0,0.0,BUY,DO NOTHING,0.03267882,,,https://www.coingecko.com/en/coins/stupidcoin-2

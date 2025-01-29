@@ -115,10 +115,10 @@ load_dotenv()
 # - "deepseek-chat" (DeepSeek's V3 model - fast & efficient)
 # - "deepseek-reasoner" (DeepSeek's R1 reasoning model)
 # - "0" (Use config.py's AI_MODEL setting)
-MODEL_OVERRIDE = "deepseek-chat"  # Set to "0" to disable override
+MODEL_OVERRIDE = "0"  # Set to "0" to disable override
 
 # DeepSeek API settings
-DEEPSEEK_BASE_URL = "https://api.deepseek.com"  # Base URL for DeepSeek API
+DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"  # Base URL for DeepSeek API
 
 # 🤖 Agent Model Selection
 AI_MODEL = MODEL_OVERRIDE if MODEL_OVERRIDE != "0" else config.AI_MODEL
@@ -170,20 +170,7 @@ class NewOrTopAgent:
         }
         
         # Initialize AI client based on model
-        if "deepseek" in AI_MODEL.lower():
-            deepseek_key = os.getenv("DEEPSEEK_KEY")
-            if deepseek_key:
-                self.ai_client = openai.OpenAI(
-                    api_key=deepseek_key,
-                    base_url=DEEPSEEK_BASE_URL
-                )
-                print(f"🚀 Using DeepSeek model: {AI_MODEL}")
-            else:
-                raise ValueError("🚨 DEEPSEEK_KEY not found in environment variables!")
-        else:
-            self.ai_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_KEY"))
-            print(f"🤖 Using Claude model: {AI_MODEL}")
-            
+        self.ai_client = init_ai_client()
         print_fancy("🌙 Moon Dev's New & Top Coins Agent Initialized! 🌟", 'white', 'on_magenta', SUCCESS_EMOJIS)
         
     def get_top_gainers(self) -> pd.DataFrame:
@@ -521,6 +508,18 @@ class NewOrTopAgent:
             print_fancy(f"SELL: {summary.get('SELL', 0)} 📉", 'red', 'on_grey')
             print_fancy(f"DO NOTHING: {summary.get('DO NOTHING', 0)} 🎯", 'yellow', 'on_grey')
             print_fancy("=" * 50, 'blue', 'on_white')
+
+def init_ai_client():
+    if "deepseek" in AI_MODEL.lower():
+        deepseek_key = os.getenv("DEEPSEEK_KEY")
+        if not deepseek_key:
+            raise ValueError("🚨 DEEPSEEK_KEY not found in environment variables!")
+        return openai.OpenAI(
+            api_key=deepseek_key,
+            base_url=DEEPSEEK_BASE_URL
+        )
+    else:
+        return anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_KEY"))
 
 def main():
     """Main function to run the agent"""
