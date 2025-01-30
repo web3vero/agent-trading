@@ -119,9 +119,31 @@ Rate the negativity from 0.0 to 1.0 where:
 Respond with only a number between 0.0 and 1.0.
 """
 
-PROMPT_777 = """Send back a short bible verse about persistence, perseverance, or hard work.
+PROMPT_777 = """Send back a different bible verse about persistence, perseverance, or hard work.
+Choose from verses about:
+- Not giving up
+- Staying strong
+- Working hard
+- Keeping faith
+- Enduring challenges
+- Being patient
+- Trusting the journey
+- Reaping rewards
+- Standing firm
+- Moving forward
+
+Pick a different verse each time, not just Galatians 6:9.
 Keep the response under 50 tokens total.
 Send only the verse, no other text.
+
+Example verses (don't use these exact ones, find similar ones):
+- James 1:12
+- Philippians 3:14
+- Isaiah 40:31
+- Romans 5:3-4
+- 2 Thessalonians 3:13
+
+send back the actual verse
 """
 
 # Add new constants for emojis
@@ -807,7 +829,7 @@ class ChatAgent:
                 verse_response = self.model.generate_response(
                     system_prompt=PROMPT_777,
                     user_content="777",
-                    temperature=0.9,
+                    temperature=0.9,  # Higher temperature for more variety
                     max_tokens=MAX_RESPONSE_TOKENS
                 )
                 emojis = self._get_random_lucky_emojis()
