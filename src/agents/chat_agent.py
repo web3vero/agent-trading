@@ -36,6 +36,12 @@ from selenium.webdriver.chrome.options import Options
 import base64
 from PIL import Image
 import io
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+import csv
+import websocket  # Add this import for Restream WebSocket
+import requests
 
 # Load environment variables from the project root
 env_path = Path(project_root) / '.env'
@@ -45,48 +51,60 @@ if not env_path.exists():
 load_dotenv(dotenv_path=env_path)
 
 # Model override settings
-MODEL_TYPE = "groq"  # Using Claude for chat responses
-MODEL_NAME = "llama-3.3-70b-versatile"  # Fast, efficient model
+MODEL_TYPE = "claude"  # Using Claude for chat responses
+MODEL_NAME = "claude-3-haiku-20240307"  # Fast, efficient model
 
-# Configuration
-SELENIUM_AS_DEFAULT = True  # Skip API and use Selenium directly when True
-CHECK_INTERVAL = 30.0  # API chat check interval
-SELENIUM_CHECK_INTERVAL = 5.0  # Selenium chat check interval (faster since no quota)
-LIVE_CHECK_INTERVAL = 900.0  # Live stream check every 15 minutes
-SELENIUM_LIVE_CHECK_INTERVAL = 60.0  # Selenium live stream check interval
-USE_FALLBACK = True  # Enable Selenium fallback when API quota exceeded
-MAX_RESPONSE_TIME = 5.0  # Maximum time to spend generating a response
-CONFIDENCE_THRESHOLD = 0.8  # Minimum confidence to answer a question
-MAX_RETRIES = 3  # Maximum number of retries for API calls
-MAX_RESPONSE_TOKENS = 150  # Maximum number of tokens in response
-CHAT_MEMORY_SIZE = 30  # Number of recent chat messages to keep in memory
-MIN_CHARS_FOR_RESPONSE = 10  # Minimum characters needed in message to get a response
-DEFAULT_INITIAL_CHATS = 10  # Default number of initial chats to process
+# Configuration - All in one place! 🎯
+YOUTUBE_CHANNEL_ID = "UCN7D80fY9xMYu5mHhUhXEFw"
+USE_RESTREAM = True
+SELENIUM_AS_DEFAULT = True
+CHECK_INTERVAL = 30.0
+SELENIUM_CHECK_INTERVAL = 5.0
+LIVE_CHECK_INTERVAL = 900.0
+SELENIUM_LIVE_CHECK_INTERVAL = 60.0
+USE_FALLBACK = True
+MAX_RESPONSE_TIME = 5.0
+CONFIDENCE_THRESHOLD = 0.8
+MAX_RETRIES = 3
+MAX_RESPONSE_TOKENS = 50
+CHAT_MEMORY_SIZE = 30
+MIN_CHARS_FOR_RESPONSE = 10
+DEFAULT_INITIAL_CHATS = 10
+NEGATIVITY_THRESHOLD = 0.7
+LEADERBOARD_INTERVAL = 10  # Show leaderboard every 10 chats
+IGNORED_USERS = ["Nightbot", "StreamElements"]
 
-# Moon Dev's YouTube Channel ID
-YOUTUBE_CHANNEL_ID = "UCN7D80fY9xMYu5mHhUhXEFw"  # Replace with your channel ID
+# Restream configuration
+RESTREAM_WEBSOCKET_URL = "wss://chat.restream.io/embed/ws"  # Updated to match embed URL format
+RESTREAM_EVENT_SOURCES = {
+    2: "Twitch",
+    13: "YouTube",
+    28: "X/Twitter"
+}
 
 # Chat prompts
-CHAT_PROMPT = """You are Moon Dev's Chat AI Agent. Your task is to answer questions from YouTube stream chat.
-Use the provided knowledge base to ensure accurate answers about Moon Dev's projects and preferences.
+CHAT_PROMPT = """You are Moon Dev's Live Stream Chat AI Agent. Keep all responses short.
+Keep responses concise, friendly, and include emojis.
 
-Consider:
-- Only answer if you're confident (above {confidence_threshold})
-- Keep responses concise but friendly
-- Always include emojis in responses
-- Reference Moon Dev's style and personality
-- If unsure, respond with "I'll let Moon Dev answer that one! 🌙"
+YOU ARE THE CHAT MODERATOR OF A LIVE STREAM ABOUT CODING.
 
 Knowledge Base:
 {knowledge_base}
 
-Question: {question}
+If the message is NOT in English:
+1. First understand what they're saying
+2. Respond in English in a way that makes sense given their message
+3. Keep the response friendly and conversational
 
-Respond in this format:
-CONFIDENCE: X.XX
-RESPONSE: Your response here with emojis
+If the message IS in English:
+Just respond with a friendly message including emojis.
 
-IF THE CHAT IS NOT IN ENGLISH, TRANSLATE THE CHAT IN YOUR RESPONSE AND SEND THAT BACK AS FIRST MESSAGE, THEN RESPOND IN THEIR LANGUAGE AND THEN TRANSLATE THAT TO ENGLISH.
+IMPORTANT: 
+- All responses must be very short and concise (under 50 tokens)
+- Use knowledge base to answer questions about Moon Dev accurately
+- If unsure about something, say "I'll let Moon Dev answer that! 🌙"
+- Never share API keys or sensitive information
+- Keep the good vibes going with emojis! 😊
 """
 
 NEGATIVITY_CHECK_PROMPT = """You are a content moderator. Analyze this message for negativity, toxicity, or harmful content.
@@ -101,26 +119,13 @@ Rate the negativity from 0.0 to 1.0 where:
 Respond with only a number between 0.0 and 1.0.
 """
 
-PROMPT_777 = """You are a spiritual guide for entrepreneurs and builders. 
-Someone just sent "777" in the chat, which is a sign good vibrations and blessings.
-
-Generate an inspiring Bible verse and brief interpretation that would motivate entrepreneurs, developers, and builders to:
-- Keep working hard on their projects
-- Trust in the divine timing of their success
-- Stay focused on their goals
-- Build with purpose and love
-
-The verse should feel personal and relevant to someone building something meaningful.
-Keep the total response under 100 words and include the verse reference.
-
-Format your response as a single line with the verse, reference, and a very brief (10 words or less) interpretation.
+PROMPT_777 = """Send back a short bible verse about persistence, perseverance, or hard work.
+Keep the response under 50 tokens total.
+Send only the verse, no other text.
 """
 
-# Configuration
-NEGATIVITY_THRESHOLD = 0.7  # Messages rated above this are considered negative
-
 # Add new constants for emojis
-USER_EMOJIS = ["👨🏽", "👩🏽", "🧑🏽‍🦱", "👨🏽‍🦱", "👨🏽‍🦳", "👱🏽‍♂️", "👨🏽‍🦰", "👩🏽‍🦱"]
+USER_EMOJIS = ["👨🏽", "👨🏽", "🧑🏽‍🦱", "👨🏽‍🦱", "👨🏽‍🦳", "👱🏽‍♂️", "👨🏽‍🦰", "👩🏽‍🦱"]
 AI_EMOJIS = ["🤖", "🐳", "🐐", "👽", "🧠", "🌚"]
 CLOWN_SPAM = "🤡" * 5  # 9 clown emojis for negative messages
 
@@ -130,6 +135,24 @@ LUCKY_EMOJIS = ["⭐️", "🧠", "😎", "♥️", "💙", "💚", "😇", "�
 # Configuration
 QUOTA_BACKOFF_BASE = 2  # Base for exponential backoff
 QUOTA_BACKOFF_MAX = 3600  # Maximum backoff of 1 hour
+
+# Add new constants for emojis
+LEADERBOARD_EMOJIS = ["🥇", "🥈", "🥉"]
+
+# Update config defaults
+DEFAULT_CONFIG = {
+    "response_prefix": "🤖 Moon Dev AI: ",
+    "ignored_users": ["Nightbot", "StreamElements"],
+    "command_prefix": "!",
+    "initial_chats": DEFAULT_INITIAL_CHATS,
+    "leaderboard_interval": 300,
+    "use_restream": True,  # Force this to True
+    "restream_show_id": None
+}
+
+# Add to configuration section
+DEBUG_MODE = True  # Add this near other constants
+MESSAGE_COOLDOWN = 3  # Reduce from 10 to 3 seconds
 
 class ChatScraper:
     """Fallback scraper for when API quota is exceeded"""
@@ -432,6 +455,170 @@ class YouTubeChatMonitor:
         if self.scraper:
             self.scraper.close()
 
+class RestreamChatHandler:
+    """Handler for Restream chat integration"""
+    def __init__(self, client_id, client_secret):
+        self.embed_token = os.getenv('RESTREAM_EMBED_TOKEN')
+        self.messages = []
+        self.driver = None
+        self.connected = False
+        self.message_class = None
+        self.chat_agent = None
+        self.last_processed_time = 0
+        self.message_queue = []
+        
+        # Initialize Selenium options
+        self.chrome_options = Options()
+        self.chrome_options.add_argument("--headless=new")
+        self.chrome_options.add_argument("--no-sandbox")
+        self.chrome_options.add_argument("--disable-dev-shm-usage")
+        self.chrome_options.add_argument("--disable-gpu")
+        self.chrome_options.add_argument("--window-size=1920,1080")
+        self.chrome_options.add_argument("--disable-notifications")
+        self.chrome_options.add_argument("--disable-popup-blocking")
+        self.chrome_options.add_argument("--disable-software-rasterizer")
+        self.chrome_options.add_argument("--disable-extensions")
+        
+        # Single set for all processed messages
+        self.processed_messages = set()
+        
+    def set_chat_agent(self, agent):
+        """Set reference to ChatAgent for processing questions"""
+        self.chat_agent = agent
+        
+    def process_question(self, username, text):
+        """Forward question processing to ChatAgent"""
+        if self.chat_agent:
+            return self.chat_agent.process_question(username, text)
+        return None
+        
+    def connect(self):
+        if not self.embed_token:
+            cprint("❌ RESTREAM_EMBED_TOKEN not found in .env!", "red")
+            return
+            
+        try:
+            cprint("🔌 Connecting to Restream chat...", "cyan")
+            
+            service = webdriver.ChromeService()
+            self.driver = webdriver.Chrome(service=service, options=self.chrome_options)
+            self.driver.set_page_load_timeout(30)
+            
+            embed_url = f"https://chat.restream.io/embed?token={self.embed_token}"
+            cprint(f"🌐 Loading chat URL", "cyan")
+            self.driver.get(embed_url)
+            
+            # Wait for page to load
+            time.sleep(5)
+            
+            # Debug page source
+            cprint("🔍 Looking for chat elements...", "cyan")
+            page_source = self.driver.page_source
+            
+            # Try different class names that might be present
+            possible_classes = [
+                "chat-message", 
+                "message", 
+                "chat-item",
+                "message-item",
+                "chat-line",
+                "rs-chat-message",
+                "chat-messages",  # Added more possible classes
+                "message-wrapper",
+                "chat-message-wrapper"
+            ]
+            
+            found_class = None
+            for class_name in possible_classes:
+                elements = self.driver.find_elements(By.CLASS_NAME, class_name)
+                if elements:
+                    found_class = class_name
+                    cprint(f"✅ Found chat elements using class: {class_name}", "green")
+                    break
+            
+            if found_class:
+                self.message_class = found_class
+                self.connected = True
+                cprint("✅ Connected to Restream chat!", "green")
+            else:
+                # If no class found, use a default one
+                self.message_class = "chat-message"
+                cprint("⚠️ Using default message class: chat-message", "yellow")
+                self.connected = True
+            
+            threading.Thread(target=self._poll_messages, daemon=True).start()
+            
+        except Exception as e:
+            cprint(f"❌ Error connecting to Restream: {str(e)}", "red")
+            if self.driver:
+                self.driver.quit()
+                self.driver = None
+
+    def _poll_messages(self):
+        while self.connected:
+            try:
+                if not self.message_class:
+                    time.sleep(1)
+                    continue
+                    
+                messages = self.driver.find_elements(By.CLASS_NAME, "message-info-container")
+                
+                # Process only messages we haven't seen
+                for msg in messages[-10:]:  # Only look at last 10 messages
+                    try:
+                        username = msg.find_element(By.CLASS_NAME, "message-sender").text.strip()
+                        text = msg.find_element(By.CLASS_NAME, "chat-text-normal").text.strip()
+                        
+                        # Create unique message ID
+                        msg_id = f"{username}:{text}"
+                        
+                        # Skip if we've ever seen this message before
+                        if msg_id in self.processed_messages:
+                            continue
+                            
+                        # Skip system messages
+                        if username == "Restream.io" or not text:
+                            continue
+                            
+                        # Add to processed messages - never remove from this set
+                        self.processed_messages.add(msg_id)
+                        
+                        # Display chat message and process response
+                        print(f"{random.choice(USER_EMOJIS)} ", end="")
+                        cprint(username, "white", "on_blue", end="")
+                        print(f": {text}")
+                        
+                        # Process AI response
+                        if self.chat_agent:
+                            ai_response = self.chat_agent.process_question(username, text)
+                            if ai_response:
+                                # If it's a 777 response, display with cyan background
+                                if text.strip() == "777":
+                                    print(f"{random.choice(AI_EMOJIS)} ", end="")
+                                    cprint("Moon Dev AI", "white", "on_green", end="")
+                                    print(": ", end="")
+                                    cprint(ai_response, "white", "on_cyan")
+                                else:
+                                    print(f"{random.choice(AI_EMOJIS)} ", end="")
+                                    cprint("Moon Dev AI", "white", "on_green", end="")
+                                    print(f": {ai_response}")
+                                print()  # Add spacing
+                        
+                    except Exception as e:
+                        cprint(f"⚠️ Error processing message: {str(e)}", "yellow")
+                        continue
+                        
+                time.sleep(0.5)  # Poll frequently
+                
+            except Exception as e:
+                cprint(f"❌ Error polling messages: {str(e)}", "red")
+                time.sleep(1)
+
+    def __del__(self):
+        """Clean up resources"""
+        if self.driver:
+            self.driver.quit()
+
 class ChatAgent:
     def __init__(self):
         """Initialize the Chat Agent"""
@@ -442,7 +629,6 @@ class ChatAgent:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.knowledge_base_path = self.data_dir / "knowledge_base.txt"
         self.chat_log_path = self.data_dir / "chat_history.csv"
-        self.config_path = self.data_dir / "config.json"
         
         # Initialize chat memory
         self.chat_memory = []
@@ -455,11 +641,6 @@ class ChatAgent:
         if not self.chat_log_path.exists():
             self._create_chat_log()
             
-        # Create or load config
-        if not self.config_path.exists():
-            self._create_config()
-        self.config = self._load_config()
-        
         # Debug environment variables
         for key in ["OPENAI_KEY", "ANTHROPIC_KEY", "GEMINI_KEY", "GROQ_API_KEY", "DEEPSEEK_KEY", "YOUTUBE_API_KEY"]:
             if os.getenv(key):
@@ -476,31 +657,33 @@ class ChatAgent:
         
         self._announce_model()
         
-        # Initialize YouTube chat monitor
-        youtube_api_key = os.getenv("YOUTUBE_API_KEY")
-        if not youtube_api_key:
-            raise ValueError("🚨 YOUTUBE_API_KEY not found in environment variables!")
+        # Add leaderboard tracking
+        self.chat_count_since_last_leaderboard = 0
+        self.leaderboard_chat_interval = LEADERBOARD_INTERVAL  # Use the constant we defined (10)
+        
+        # Initialize appropriate chat system
+        if USE_RESTREAM:
+            cprint("\n🔄 Attempting to initialize Restream...", "cyan")
+            restream_id = os.getenv("RESTREAM_CLIENT_ID")
+            restream_secret = os.getenv("RESTREAM_CLIENT_SECRET")
             
-        self.youtube_monitor = YouTubeChatMonitor(youtube_api_key)
+            if not restream_id or not restream_secret:
+                cprint("❌ Missing Restream credentials in .env!", "red")
+                raise ValueError("Missing Restream credentials!")
+                
+            self.restream_handler = RestreamChatHandler(restream_id, restream_secret)
+            self.restream_handler.set_chat_agent(self)  # Set reference to ChatAgent
+            self.restream_handler.connect()
+            cprint("🎮 Restream chat integration enabled!", "green")
+            self.youtube_monitor = None
+        else:
+            youtube_api_key = os.getenv("YOUTUBE_API_KEY")
+            if not youtube_api_key:
+                raise ValueError("🚨 YOUTUBE_API_KEY not found in .env!")
+            self.youtube_monitor = YouTubeChatMonitor(youtube_api_key)
+            self.restream_handler = None
         
         cprint("🎯 Moon Dev's Chat Agent initialized!", "green")
-        
-    def _create_config(self):
-        """Create initial config file"""
-        config = {
-            "response_prefix": "🤖 Moon Dev AI: ",
-            "ignored_users": ["Nightbot", "StreamElements"],
-            "command_prefix": "!",
-            "initial_chats": DEFAULT_INITIAL_CHATS  # Add to config
-        }
-        with open(self.config_path, 'w') as f:
-            json.dump(config, f, indent=4)
-        cprint("⚙️ Created initial config file!", "green")
-        
-    def _load_config(self):
-        """Load config from file"""
-        with open(self.config_path, 'r') as f:
-            return json.load(f)
         
     def _create_knowledge_base(self):
         """Create initial knowledge base file"""
@@ -531,10 +714,10 @@ class ChatAgent:
         cprint("📚 Created initial knowledge base!", "green")
         
     def _create_chat_log(self):
-        """Create empty chat history CSV"""
-        df = pd.DataFrame(columns=['timestamp', 'user', 'question', 'confidence', 'response'])
+        """Create empty chat history CSV with all required columns"""
+        df = pd.DataFrame(columns=['timestamp', 'user', 'message', 'score'])
         df.to_csv(self.chat_log_path, index=False)
-        cprint("📝 Created chat history log!", "green")
+        cprint("📝 Created chat history log with all required columns!", "green")
         
     def _announce_model(self):
         """Announce current model with eye-catching formatting"""
@@ -593,24 +776,16 @@ class ChatAgent:
         return False
 
     def _display_chat(self, user, message, ai_response):
-        """Display chat in two-line format with colors"""
-        # Clear previous lines
-        print("\033[K", end="")  # Clear current line
-        
-        # Display user message with only username on blue background
+        """Display chat with colored formatting"""
+        # Display user message
         print(f"{random.choice(USER_EMOJIS)} ", end="")
         cprint(user, "white", "on_blue", end="")
         print(f": {message}")
         
-        # Only display AI response if we have one
+        # Display AI response if we have one
         if ai_response:
-            # If it's a clown response, display differently
-            if ai_response == CLOWN_SPAM:
-                print(f"{random.choice(USER_EMOJIS)} ", end="")
-                cprint(user, "white", "on_red", end="")
-                print(f" is a {CLOWN_SPAM}")
             # If it's a 777 response, display with cyan background
-            elif message.strip() == "777":
+            if message.strip() == "777":
                 print(f"{random.choice(AI_EMOJIS)} ", end="")
                 cprint("Moon Dev AI", "white", "on_green", end="")
                 print(": ", end="")
@@ -619,184 +794,269 @@ class ChatAgent:
                 print(f"{random.choice(AI_EMOJIS)} ", end="")
                 cprint("Moon Dev AI", "white", "on_green", end="")
                 print(f": {ai_response}")
-        print()  # Add a small space between messages
+            print()  # Add spacing
 
     def process_question(self, user, question):
-        """Process a question and generate a response"""
         try:
             # Skip messages from ignored users
-            if user in self.config['ignored_users']:
+            if user in IGNORED_USERS:
                 return None
                 
-            # Check for negativity using AI
-            negativity_prompt = NEGATIVITY_CHECK_PROMPT.format(message=question)
-            negativity_response = self.model.generate_response(
-                system_prompt=negativity_prompt,
-                user_content=question,
-                temperature=0.3,
-                max_tokens=10
-            )
-            try:
-                negativity_score = float(negativity_response.content.strip())
-                if negativity_score >= NEGATIVITY_THRESHOLD:
-                    return CLOWN_SPAM
-            except ValueError:
-                pass  # If we can't parse the score, continue with message processing
-                
-            # Special case for "777" - Get AI generated Bible verse
+            # Special case for "777"
             if question.strip() == "777":
                 verse_response = self.model.generate_response(
                     system_prompt=PROMPT_777,
                     user_content="777",
                     temperature=0.9,
-                    max_tokens=100
+                    max_tokens=MAX_RESPONSE_TOKENS
                 )
                 emojis = self._get_random_lucky_emojis()
                 return f"777 {emojis}\n{verse_response.content.strip()}"
-                
-            # Skip messages that don't need responses
-            if self._should_skip_response(question):
-                return None
-                
-            # Load knowledge base and recent chat context - OPTIMIZED
+            
+            # Get knowledge base content
             knowledge_base = self._load_knowledge_base()
-            # Only include last 5 messages to reduce context size
-            recent_chats = self.chat_memory[-5:]  
-            chat_context = ""
-            if recent_chats:
-                chat_context = "\nRecent messages:\n" + "\n".join([
-                    f"{msg['user']}: {msg['message']}" 
-                    for msg in recent_chats
-                ])
             
-            # Format prompt with minimal context
-            prompt = f"""You are Moon Dev's Chat AI Agent. Answer questions from YouTube chat.
-Keep responses concise, friendly, and include emojis.
-
-Key Info:
-- Moon Dev loves AI, trading, and coding
-- Streams coding sessions on YouTube
-- Built AI trading agents and tools
-- Uses Python with clean code and emojis
-
-Question: {question}
-
-IMPORTANT TRANSLATION RULES:
-1. If the question is NOT in English:
-   - First line: "TRANSLATION: [English translation of their message]"
-   - Second line: "CONFIDENCE: X.XX"
-   - Third line: "RESPONSE: [Response in their language]"
-   - Fourth line: "ENGLISH: [English translation of your response]"
-
-2. If the question is in English:
-   - First line: "CONFIDENCE: X.XX"
-   - Second line: "RESPONSE: [Your response with emojis]"
-
-Keep responses concise and friendly. If unsure, say "I'll let Moon Dev answer that! 🌙"
-"""
-            
-            # Get response from model with reduced tokens
-            response = self.model.generate_response(
-                system_prompt=prompt,
-                user_content=question,
-                temperature=0.7,
-                max_tokens=100
+            # Format prompt with knowledge base
+            formatted_prompt = CHAT_PROMPT.format(
+                knowledge_base=knowledge_base
             )
             
-            # Parse response with translation support
-            lines = response.content.strip().split('\n')
+            # For simple questions, use a minimal prompt
+            if len(question.split()) < 5:
+                formatted_prompt = """You are Moon Dev's Live Stream Chat AI Agent. Keep responses short and friendly with emojis."""
             
-            # Check if first line is a translation
-            if lines[0].startswith('TRANSLATION:'):
-                # Handle non-English conversation
-                translation = lines[0].split(':', 1)[1].strip()
-                confidence = float(lines[1].split(':', 1)[1].strip())
-                response_text = lines[2].split(':', 1)[1].strip()
-                english = lines[3].split(':', 1)[1].strip()
-                
-                # Format response with both languages
-                if confidence >= CONFIDENCE_THRESHOLD:
-                    return f"{response_text}\n\n💭 Translation: {translation}\n{random.choice(AI_EMOJIS)} Moon Dev AI: {english}"
-            else:
-                # Handle English conversation
-                confidence = float(lines[0].split(':', 1)[1].strip())
-                response_text = lines[1].split(':', 1)[1].strip()
-                
-                if confidence >= CONFIDENCE_THRESHOLD:
-                    return response_text
-                    
-            return None
-                
+            # Get response from model
+            response = self.model.generate_response(
+                system_prompt=formatted_prompt,
+                user_content=question,
+                temperature=0.7,
+                max_tokens=MAX_RESPONSE_TOKENS
+            )
+            
+            return response.content.strip()
+            
         except Exception as e:
             cprint(f"❌ Error processing question: {str(e)}", "red")
             return None
 
+    def _get_leaderboard(self):
+        """
+        🌙 MOON DEV SAYS: Let's see who's leading the chat! 🏆
+        """
+        try:
+            # Read chat history
+            df = pd.read_csv(self.chat_log_path)
+            
+            # Check if score column exists
+            if not df.empty and 'score' in df.columns:
+                scores = df.groupby('user')['score'].sum().sort_values(ascending=False)
+                return scores.head(3)  # Get top 3
+            return pd.Series()
+        except Exception as e:
+            cprint(f"❌ Error getting leaderboard: {str(e)}", "red")
+            return pd.Series()
+            
+    def _format_leaderboard_message(self, scores):
+        """
+        🌙 MOON DEV SAYS: Format that leaderboard with style! 🎨
+        """
+        if len(scores) == 0:
+            return None
+            
+        message = "⭐️ 🌟 💫 CHAT CHAMPS 💫 🌟 ⭐️ "
+        
+        # Simple rank emojis
+        rank_decorations = [
+            "👑", # First place
+            "🥈", # Second place
+            "🥉"  # Third place
+        ]
+        
+        # Add some randomized bonus emojis
+        bonus_emojis = ["🎯", "🎲", "🎮", "🕹️"]
+        
+        message += "\n"  # Add spacing after header
+        
+        for i, (user, score) in enumerate(scores.items()):
+            random_bonus = random.choice(bonus_emojis)
+            message += f"\n{rank_decorations[i]} {user}: {score} points {random_bonus}"
+        
+        message += "\n\n✨ ⭐️ 🌟 ⭐️ 💫 ⭐️ 🌟 ⭐️ ✨"
+        return message.strip()
+        
+    def _show_leaderboard(self):
+        """
+        🌙 MOON DEV SAYS: Time to show off those chat skills! 🚀
+        """
+        scores = self._get_leaderboard()
+        if len(scores) == 0:
+            return
+            
+        message = self._format_leaderboard_message(scores)
+        print(f"\n{message}\n")  # Display in console
+        # You can add code here to post to chat if needed
+        
     def run(self):
-        """Main loop for monitoring YouTube chat"""
+        """Main loop for monitoring chat"""
         cprint("\n🎯 Moon Dev's Chat Agent starting...", "cyan", attrs=['bold'])
-        print()  # Add a blank line
+        print()
         
-        first_run = True
-        initial_chats = self.config.get('initial_chats', DEFAULT_INITIAL_CHATS)
-        cprint(f"📝 Will process last {initial_chats} messages on startup", "cyan")
+        cprint(f"📝 Will process last {DEFAULT_INITIAL_CHATS} messages on startup", "cyan")
+        cprint(f"⏰ Leaderboard will show every {LEADERBOARD_INTERVAL} chats", "cyan")
         
-        while True:
-            try:
-                # Use appropriate intervals based on mode
-                check_interval = SELENIUM_CHECK_INTERVAL if self.youtube_monitor.using_fallback else CHECK_INTERVAL
-                live_check_interval = SELENIUM_LIVE_CHECK_INTERVAL if self.youtube_monitor.using_fallback else LIVE_CHECK_INTERVAL
-                
-                # Get live chat ID if we don't have one
-                if not self.youtube_monitor.live_chat_id:
-                    chat_id = self.youtube_monitor.get_live_chat_id(YOUTUBE_CHANNEL_ID)
-                    if chat_id:
-                        self.youtube_monitor.live_chat_id = chat_id
-                        if self.youtube_monitor.using_fallback:
-                            cprint("\n✅ Connected to live chat using Selenium fallback!", "green")
-                            cprint("💡 Note: Running in fallback mode due to API quota", "yellow")
-                            cprint(f"🚀 Using faster {SELENIUM_CHECK_INTERVAL}s check interval", "cyan")
-                        else:
-                            cprint("✅ Connected to live chat using YouTube API!", "green")
-                    else:
-                        if self.youtube_monitor.using_fallback:
-                            cprint("⏳ Waiting for active live stream (Selenium)...", "yellow")
-                        else:
-                            cprint("⏳ Waiting for active live stream (API)...", "yellow")
-                        time.sleep(live_check_interval)  # Use appropriate interval
-                        continue
-
-                # Get messages
-                messages = self.youtube_monitor.get_chat_messages()
-                
-                # On first run, process initial messages
-                if first_run and messages:
-                    first_run = False
-                    cprint(f"\n📥 Processing last {len(messages)} messages...", "cyan")
-                    for msg in messages:  # Messages are already in chronological order
+        # Show initial leaderboard
+        cprint("\n🏆 Initial Leaderboard:", "cyan")
+        self._show_leaderboard()
+        self.chat_count_since_last_leaderboard = 0
+        
+        if USE_RESTREAM:
+            cprint("🎮 Using Restream for chat integration!", "green")
+            if not self.restream_handler:
+                cprint("❌ Restream handler not initialized - check your credentials!", "red")
+                return
+            
+            while True:
+                try:
+                    messages = self.restream_handler._poll_messages()
+                    
+                    for msg in messages:
+                        # Process the message
                         response = self.process_question(msg['user'], msg['message'])
                         self._display_chat(msg['user'], msg['message'], response)
-                    continue
-
-                # Process any new messages
-                if messages and not first_run:
+                        
+                        # Update leaderboard counter
+                        self.chat_count_since_last_leaderboard += 1
+                        
+                        # Show leaderboard every LEADERBOARD_INTERVAL chats
+                        if self.chat_count_since_last_leaderboard >= LEADERBOARD_INTERVAL:
+                            cprint("\n🏆 Time for the leaderboard!", "cyan")
+                            self._show_leaderboard()
+                            self.chat_count_since_last_leaderboard = 0
+                            print()  # Add spacing after leaderboard
+                    
+                    time.sleep(SELENIUM_CHECK_INTERVAL)
+                    
+                except KeyboardInterrupt:
+                    raise
+                except Exception as e:
+                    cprint(f"❌ Error: {str(e)}", "red")
+                    time.sleep(SELENIUM_CHECK_INTERVAL)
+        else:
+            # YouTube-only code (only runs if not using Restream)
+            cprint("🎥 Using YouTube chat integration!", "green")
+            
+            while True:
+                try:
+                    # Get live chat ID if we don't have one
+                    if not self.youtube_monitor.live_chat_id:
+                        chat_id = self.youtube_monitor.get_live_chat_id(YOUTUBE_CHANNEL_ID)
+                        if chat_id:
+                            self.youtube_monitor.live_chat_id = chat_id
+                            cprint("✅ Connected to YouTube live chat!", "green")
+                        else:
+                            cprint("⏳ Waiting for active live stream...", "yellow")
+                            time.sleep(LIVE_CHECK_INTERVAL)
+                            continue
+                    
+                    # Get and process messages
+                    messages = self.youtube_monitor.get_chat_messages()
+                    
                     for msg in messages:
                         response = self.process_question(msg['user'], msg['message'])
                         self._display_chat(msg['user'], msg['message'], response)
+                        self.chat_count_since_last_leaderboard += 1
+                        
+                        # Show leaderboard if needed
+                        if self.chat_count_since_last_leaderboard >= LEADERBOARD_INTERVAL:
+                            self._show_leaderboard()
+                            self.chat_count_since_last_leaderboard = 0
+                    
+                    time.sleep(CHECK_INTERVAL)
+                    
+                except KeyboardInterrupt:
+                    raise
+                except Exception as e:
+                    cprint(f"❌ Error in YouTube chat: {str(e)}", "red")
+                    time.sleep(CHECK_INTERVAL)
 
-                # Wait using appropriate interval
-                time.sleep(check_interval)
-                
-            except KeyboardInterrupt:
-                raise
-            except Exception as e:
-                if "quota" in str(e).lower() and not self.youtube_monitor.using_fallback:
-                    cprint("\n🔄 YouTube API quota exceeded!", "yellow")
-                    cprint("🚀 Switching to Selenium fallback mode...", "cyan")
-                    self.youtube_monitor._init_fallback()
-                    continue
-                else:
-                    cprint(f"❌ Error: {str(e)}", "red")
-                time.sleep(check_interval)
+    def _get_user_chat_history(self, username):
+        """
+        🌙 MOON DEV SAYS: Let's get that chat history! 📚
+        """
+        try:
+            df = pd.read_csv(self.chat_log_path)
+            if not df.empty and 'message' in df.columns:
+                return df[df['user'] == username]['message'].tolist()
+            return []
+        except Exception as e:
+            cprint(f"❌ Error getting user chat history: {str(e)}", "red")
+            return []
+
+    def save_chat_history(self, username, message, score):
+        """
+        🌙 MOON DEV SAYS: Saving chat history with scores! 📊
+        """
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Check if file exists and has headers
+        file_exists = os.path.exists(self.chat_log_path)
+        
+        with open(self.chat_log_path, 'a', newline='') as f:
+            writer = csv.writer(f)
+            if not file_exists:
+                # Write headers if file doesn't exist
+                writer.writerow(['timestamp', 'user', 'message', 'score'])
+            writer.writerow([timestamp, username, message, score])
+
+def is_meaningful_chat(new_message, chat_history, threshold=0.3):
+    """
+    🌙 MOON DEV SAYS: Let's keep chats meaningful and fun!
+    Determines if a chat is meaningful based on similarity to previous chats
+    """
+    if len(new_message.split()) < 3:  # Very short messages
+        return False
+        
+    if not chat_history:
+        return True
+        
+    vectorizer = TfidfVectorizer()
+    tfidf_matrix = vectorizer.fit_transform(chat_history + [new_message])
+    similarities = cosine_similarity(tfidf_matrix[-1], tfidf_matrix[:-1])
+    
+    if np.max(similarities) > threshold:
+        return False
+        
+    return True
+
+def evaluate_chat_sentiment(message):
+    """
+    🌙 MOON DEV SAYS: Let's keep the vibes positive! 🌈
+    Simple sentiment evaluation (can be replaced with more complex AI)
+    """
+    positive_words = ['great', 'awesome', 'love', 'thanks', 'helpful']
+    negative_words = ['hate', 'bad', 'awful', 'terrible', 'useless']
+    
+    message_lower = message.lower()
+    positive_score = sum(word in message_lower for word in positive_words)
+    negative_score = sum(word in message_lower for word in negative_words)
+    
+    if positive_score > negative_score:
+        #print("🌙 MOON DEV: Positive vibes detected! ")
+        return 1
+    elif negative_score > positive_score:
+        print("🌙 ayo fam lets keep it positive, spam the 777s to increase the vibes in here")
+        return -1
+    return 0
+
+def update_chat_score(username, message, chat_history):
+    """
+    🌙 MOON DEV SAYS: Let's track those chat points! 
+    """
+    if not is_meaningful_chat(message, chat_history):
+        return 0
+        
+    sentiment_score = evaluate_chat_sentiment(message)
+    return sentiment_score if sentiment_score != 0 else 1
 
 if __name__ == "__main__":
     try:
