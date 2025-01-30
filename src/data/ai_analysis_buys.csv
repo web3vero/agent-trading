@@ -1,4 +1,6 @@
 timestamp,token_id,symbol,name,volume_24h,market_cap,agent_one_recommendation,agent_two_recommendation,price,agent_one_analysis,agent_two_analysis,coingecko_url
+2025-01-30T09:57:00.962571,roaland-core,ROA,ROACORE,833793.0,8419609.0,BUY,BUY,0.01799978,,,https://www.coingecko.com/en/coins/roaland-core
+2025-01-30T09:52:11.110653,alpha-3,alpha,Reject Modernity,3305491.0,2925315.0,BUY,DO NOTHING,0.0029254,,,https://www.coingecko.com/en/coins/alpha-3
 2025-01-28T08:27:52.682900,real-world-ai,RWA,Real World AI,1350132.0,5303418.0,BUY,BUY,0.00570261,,,https://www.coingecko.com/en/coins/real-world-ai
 2025-01-27T18:14:04.990803,simsai,simsai,SimsAI,196910.0,4085880.0,BUY,DO NOTHING,0.00408588,,,https://www.coingecko.com/en/coins/simsai
 2025-01-27T13:22:10.861694,gofundmeme,gfm,GoFundMeme,23898356.0,0.0,BUY,BUY,0.0404543,,,https://www.coingecko.com/en/coins/gofundmeme

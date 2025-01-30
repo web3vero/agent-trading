@@ -30,10 +30,14 @@ Remember: Past performance doesn't guarantee future results!
 """
 
 # DeepSeek Model Selection per Agent
-# Options for each: "deepseek-chat" (faster) or "deepseek-reasoner" (more analytical)
-RESEARCH_MODEL = "deepseek-chat"  # Analyzes strategies thoroughly
-BACKTEST_MODEL = "deepseek-chat"      # Creative in implementing strategies
-DEBUG_MODEL = "deepseek-chat"     # Careful code analysis
+# Options for each: 
+# - "deepseek-chat" (DeepSeek's V3 model - fast & efficient)
+# - "deepseek-reasoner" (DeepSeek's R1 reasoning model)
+# - "0" (Use config.py's AI_MODEL setting)
+RESEARCH_MODEL = "0"  # Analyzes strategies thoroughly
+BACKTEST_MODEL = "0"  # Creative in implementing strategies
+DEBUG_MODEL = "0"     # Careful code analysis
+PACKAGE_MODEL = "0"   # Optimizes package imports and dependencies
 
 # Agent Prompts
 
@@ -213,11 +217,13 @@ from io import BytesIO
 import PyPDF2
 from youtube_transcript_api import YouTubeTranscriptApi
 import openai
+from anthropic import Anthropic
 from pathlib import Path
 from termcolor import cprint
 import threading
 import itertools
 import sys
+from src.config import *  # Import config settings including AI_MODEL
 
 # DeepSeek Configuration
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
@@ -247,7 +253,8 @@ def init_deepseek_client():
     try:
         deepseek_key = os.getenv("DEEPSEEK_KEY")
         if not deepseek_key:
-            raise ValueError("🚨 DEEPSEEK_KEY not found in environment variables!")
+            cprint("⚠️ DEEPSEEK_KEY not found - DeepSeek models will not be available", "yellow")
+            return None
             
         print("🔑 Initializing DeepSeek client...")
         print("🌟 Moon Dev's RBI Agent is connecting to DeepSeek...")
@@ -262,44 +269,112 @@ def init_deepseek_client():
         return client
     except Exception as e:
         print(f"❌ Error initializing DeepSeek client: {str(e)}")
-        print("💡 Check if your DEEPSEEK_KEY is valid and properly set")
+        print("💡 Will fall back to Claude model from config.py")
+        return None
+
+def init_anthropic_client():
+    """Initialize Anthropic client for Claude models"""
+    try:
+        anthropic_key = os.getenv("ANTHROPIC_KEY")
+        if not anthropic_key:
+            raise ValueError("🚨 ANTHROPIC_KEY not found in environment variables!")
+            
+        return Anthropic(api_key=anthropic_key)
+    except Exception as e:
+        print(f"❌ Error initializing Anthropic client: {str(e)}")
         return None
 
 def chat_with_deepseek(system_prompt, user_content, model):
     """Chat with DeepSeek API using specified model"""
-    print(f"\n🤖 Starting chat with DeepSeek using {model}...")
+    print(f"\n🤖 Starting chat with model: {model}...")
     print("🌟 Moon Dev's RBI Agent is thinking...")
     
-    client = init_deepseek_client()
-    if not client:
-        print("❌ Failed to initialize DeepSeek client")
-        return None
-        
+    # Initialize clients
+    deepseek_client = None
+    anthropic_client = None
+    
+    # Determine which model to use
+    use_deepseek = model in ["deepseek-chat", "deepseek-reasoner"]
+    use_claude = model == "0" or not use_deepseek
+    
+    if use_claude:
+        anthropic_client = init_anthropic_client()
+        if not anthropic_client:
+            print("❌ Failed to initialize Anthropic client")
+            return None
+        active_model = AI_MODEL
+        print(f"🎯 Using Claude model from config: {active_model}")
+    else:
+        deepseek_client = init_deepseek_client()
+        if not deepseek_client:
+            print("⚠️ DeepSeek unavailable - falling back to Claude")
+            anthropic_client = init_anthropic_client()
+            if not anthropic_client:
+                print("❌ Failed to initialize fallback Anthropic client")
+                return None
+            active_model = AI_MODEL
+            use_claude = True
+        else:
+            active_model = model
+            
     try:
-        print("📤 Sending request to DeepSeek API...")
-        print(f"🎯 Model: {model}")
+        print("📤 Sending request to AI...")
+        print(f"🎯 Model: {active_model}")
+        print(f"🔍 System prompt length: {len(system_prompt)} chars")
+        print(f"🔍 User content length: {len(user_content)} chars")
         print("🔄 Please wait while Moon Dev's RBI Agent processes your request...")
         
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_content}
-            ],
-            temperature=0.7
-        )
-        
-        if not response or not response.choices:
-            print("❌ Empty response from DeepSeek API")
-            return None
+        try:
+            if use_claude:
+                # Use Anthropic/Claude
+                response = anthropic_client.messages.create(
+                    model=active_model,
+                    max_tokens=AI_MAX_TOKENS,
+                    temperature=AI_TEMPERATURE,
+                    system=system_prompt,
+                    messages=[
+                        {"role": "user", "content": user_content}
+                    ]
+                )
+                content = response.content[0].text.strip()
+            else:
+                # Use DeepSeek
+                response = deepseek_client.chat.completions.create(
+                    model=active_model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_content}
+                    ],
+                    temperature=AI_TEMPERATURE
+                )
+                content = response.choices[0].message.content.strip()
             
-        print("📥 Received response from DeepSeek API!")
-        print(f"✨ Response length: {len(response.choices[0].message.content)} characters")
-        return response.choices[0].message.content.strip()
+            print("📥 Received response from AI!")
+            print(f"✨ Response length: {len(content)} characters")
+            print(f"📄 Response preview: {content[:200]}...")
+            return content
+            
+        except Exception as api_error:
+            print("\n🔍 API Call Error Analysis:")
+            print(f"  ├─ Error type: {type(api_error).__name__}")
+            print(f"  ├─ Error message: {str(api_error)}")
+            if hasattr(api_error, 'response'):
+                print(f"  ├─ Response status: {api_error.response.status_code}")
+                print(f"  └─ Response body: {api_error.response.text[:200]}...")
+            else:
+                print("  └─ No response details available")
+            raise
+            
     except Exception as e:
-        print(f"❌ Error in DeepSeek chat: {str(e)}")
+        print(f"❌ Error in AI chat: {str(e)}")
         print("💡 This could be due to API rate limits or invalid requests")
         print(f"🔍 Error details: {str(e)}")
+        print(f"🔍 Error type: {type(e).__name__}")
+        if hasattr(e, '__dict__'):
+            print("🔍 Error attributes:")
+            for attr in dir(e):
+                if not attr.startswith('_'):
+                    print(f"  ├─ {attr}: {getattr(e, attr)}")
         return None
 
 def get_youtube_transcript(video_id):
@@ -639,6 +714,7 @@ if __name__ == "__main__":
         cprint(f"🤖 Using Research Model: {RESEARCH_MODEL}", "cyan")
         cprint(f"📊 Using Backtest Model: {BACKTEST_MODEL}", "cyan")
         cprint(f"🔧 Using Debug Model: {DEBUG_MODEL}", "cyan")
+        cprint(f"📦 Using Package Model: {PACKAGE_MODEL}", "cyan")
         main()
     except KeyboardInterrupt:
         cprint("\n👋 Moon Dev's RBI Agent shutting down gracefully...", "yellow")
