@@ -50,9 +50,9 @@ MODEL_TYPE = "deepseek"  # Using DeepSeek
 MODEL_NAME = "deepseek-chat"  # Fast chat model
 
 # Configuration for faster testing
-MIN_INTERVAL_MINUTES = 0.01  # Less than a second
-MAX_INTERVAL_MINUTES = 0.02  # About a second
-RECORDING_DURATION = 3  # seconds
+MIN_INTERVAL_MINUTES = 6  # Less than a second
+MAX_INTERVAL_MINUTES = 13  # About a second
+RECORDING_DURATION = 20  # seconds
 FOCUS_THRESHOLD = 8  # Minimum acceptable focus score
 AUDIO_CHUNK_SIZE = 2048
 SAMPLE_RATE = 16000
