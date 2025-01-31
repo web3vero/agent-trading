@@ -108,3 +108,9 @@ src/data/chat_agent/config.json
 **/chat_history*.csv
 **/chat_*.json
 **/knowledge_base*.txt
+
+# Add prompt log to gitignore
+src/data/chat_agent/prompt_log.txt
+
+# Also add the directory in case it doesn't exist yet
+src/data/chat_agent/*.txt

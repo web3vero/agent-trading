@@ -546,50 +546,66 @@ class ChatAgent:
         return user_data['count']
         
     def process_question(self, user, question):
-        try:
-            # Handle 777 FIRST - skip negativity check for these
-            if question.strip() == "777":
-                # Check daily limit and add points
-                daily_count = self._get_daily_777_count(user)
-                if daily_count < MAX_777_PER_DAY:
-                    self.daily_777_counts[user]['count'] += 1
-                    # Save 777 points to history
-                    self.save_chat_history(user, question, POINTS_PER_777)
+        retries = 0
+        max_retries = 3
+        
+        while retries < max_retries:  # Limit to 3 attempts
+            try:
+                # Handle 777 FIRST - skip negativity check for these
+                if question.strip() == "777":
+                    # Check daily limit and add points
+                    daily_count = self._get_daily_777_count(user)
+                    if daily_count < MAX_777_PER_DAY:
+                        self.daily_777_counts[user]['count'] += 1
+                        # Save 777 points to history
+                        self.save_chat_history(user, question, POINTS_PER_777)
+                    
+                    verse_response = self.model.generate_response(
+                        system_prompt=PROMPT_777,
+                        user_content="777",
+                        temperature=0.9,
+                        max_tokens=MAX_RESPONSE_TOKENS
+                    )
+                    emojis = self._get_random_lucky_emojis()
+                    return f"777 {emojis}\n{verse_response.content.strip()}"
                 
-                verse_response = self.model.generate_response(
-                    system_prompt=PROMPT_777,
-                    user_content="777",
-                    temperature=0.9,
-                    max_tokens=MAX_RESPONSE_TOKENS
-                )
-                emojis = self._get_random_lucky_emojis()
-                return f"777 {emojis}\n{verse_response.content.strip()}"
-            
-            # For all other messages, check negativity first
-            negativity_prompt = NEGATIVITY_CHECK_PROMPT.format(message=question)
-            negativity_response = self.model.generate_response(
-                system_prompt=negativity_prompt,
-                user_content=question,
-                temperature=0.3,
-                max_tokens=5
-            ).content.strip().lower()
-            
-            # If negative, save negative point and return love emojis
-            if negativity_response == 'true':
-                self.save_chat_history(user, question, -1)  # Negative point for negative messages
-                return LOVE_SPAM
-            
-            # Skip messages from ignored users
-            if user in IGNORED_USERS:
-                return None
+                # For all other messages, check negativity first
+                negativity_prompt = NEGATIVITY_CHECK_PROMPT.format(message=question)
+                try:
+                    negativity_response = self.model.generate_response(
+                        system_prompt=negativity_prompt,
+                        user_content=question,
+                        temperature=0.3,
+                        max_tokens=5
+                    ).content.strip().lower()
+                    
+                    # If message is negative, immediately return love emojis
+                    if negativity_response == 'true':
+                        self.save_chat_history(user, question, -1)  # Negative point
+                        return LOVE_SPAM
+                        
+                except Exception as e:
+                    # Check specifically for 503 error
+                    if "503" in str(e) and "Service Unavailable" in str(e):
+                        retries += 1
+                        if retries < max_retries:
+                            time.sleep(2)  # Wait 2 seconds
+                            continue  # Try again
+                    # Show error after max retries or for other errors
+                    cprint(f"❌ Error processing question: {str(e)}", "red")
+                    return None
                 
-            # For normal messages, calculate and save score
-            chat_history = self._get_user_chat_history(user)
-            score = update_chat_score(user, question, chat_history)
-            self.save_chat_history(user, question, score)
-            
-            # Process normal message with our chat prompt
-            formatted_prompt = """You are Moon Dev's Live Stream Chat AI Agent. 
+                # Skip messages from ignored users
+                if user in IGNORED_USERS:
+                    return None
+                
+                # For normal messages, calculate and save score
+                chat_history = self._get_user_chat_history(user)
+                score = update_chat_score(user, question, chat_history)
+                self.save_chat_history(user, question, score)
+                
+                # Process normal message with our chat prompt
+                formatted_prompt = """You are Moon Dev's Live Stream Chat AI Agent. 
 You help users learn about coding, algo trading, and Moon Dev's content.
 Keep responses short, friendly, and include emojis.
 
@@ -609,20 +625,33 @@ Frequently Asked Questions
 
 User message: {question}
 """
-            
-            # Get response from model
-            response = self.model.generate_response(
-                system_prompt=formatted_prompt.format(question=question),
-                user_content=question,
-                temperature=0.7,
-                max_tokens=MAX_RESPONSE_TOKENS
-            )
-            
-            return response.content.strip()
-            
-        except Exception as e:
-            cprint(f"❌ Error processing question: {str(e)}", "red")
-            return None
+                
+                # Get response from model
+                try:
+                    response = self.model.generate_response(
+                        system_prompt=formatted_prompt.format(question=question),
+                        user_content=question,
+                        temperature=0.7,
+                        max_tokens=MAX_RESPONSE_TOKENS
+                    )
+                except Exception as e:
+                    # Check specifically for 503 error
+                    if "503" in str(e) and "Service Unavailable" in str(e):
+                        retries += 1
+                        if retries < max_retries:
+                            time.sleep(2)  # Wait 2 seconds
+                            continue  # Try again
+                    # Show error after max retries or for other errors
+                    cprint(f"❌ Error processing question: {str(e)}", "red")
+                    return None
+                
+                return response.content.strip()
+                
+            except Exception as e:
+                # For non-API errors or after max retries
+                if not ("503" in str(e) and "Service Unavailable" in str(e)):
+                    cprint(f"❌ Error processing question: {str(e)}", "red")
+                return None
 
     def _get_leaderboard(self):
         """
