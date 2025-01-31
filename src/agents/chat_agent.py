@@ -2,7 +2,7 @@
 🌙 Moon Dev's Chat Agent
 Built with love by Moon Dev 🚀
 
-This agent monitors YouTube stream chat and answers questions using a knowledge base.
+This agent monitors Restream chat and answers questions using a knowledge base.
 """
 
 import sys
@@ -20,12 +20,8 @@ from dotenv import load_dotenv
 import pandas as pd
 from src.config import *
 from src.models import model_factory
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
 import json
 import threading
-import shutil
-import itertools
 import random
 import selenium
 from selenium import webdriver
@@ -33,15 +29,10 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
-import base64
-from PIL import Image
-import io
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 import csv
-import websocket  # Add this import for Restream WebSocket
-import requests
 
 # Load environment variables from the project root
 env_path = Path(project_root) / '.env'
@@ -51,115 +42,134 @@ if not env_path.exists():
 load_dotenv(dotenv_path=env_path)
 
 # Model override settings
-MODEL_TYPE = "claude"  # Using Claude for chat responses
-MODEL_NAME = "claude-3-haiku-20240307"  # Fast, efficient model
+MODEL_TYPE = "groq"  # Using Claude for chat responses
+MODEL_NAME = "llama-3.3-70b-versatile"  # Fast, efficient model
 
 # Configuration - All in one place! 🎯
-YOUTUBE_CHANNEL_ID = "UCN7D80fY9xMYu5mHhUhXEFw"
-USE_RESTREAM = True
-SELENIUM_AS_DEFAULT = True
-CHECK_INTERVAL = 30.0
-SELENIUM_CHECK_INTERVAL = 5.0
-LIVE_CHECK_INTERVAL = 900.0
-SELENIUM_LIVE_CHECK_INTERVAL = 60.0
-USE_FALLBACK = True
-MAX_RESPONSE_TIME = 5.0
+RESTREAM_CHECK_INTERVAL = 0.1  # Reduce to 100ms for more responsive chat
 CONFIDENCE_THRESHOLD = 0.8
 MAX_RETRIES = 3
-MAX_RESPONSE_TOKENS = 50
+MAX_RESPONSE_TOKENS = 50  # Increase to allow longer responses
 CHAT_MEMORY_SIZE = 30
-MIN_CHARS_FOR_RESPONSE = 10
+MIN_CHARS_FOR_RESPONSE = 30
 DEFAULT_INITIAL_CHATS = 10
-NEGATIVITY_THRESHOLD = 0.7
+NEGATIVITY_THRESHOLD = 0.3  # Lower this from 0.4 to catch more negative messages
 LEADERBOARD_INTERVAL = 10  # Show leaderboard every 10 chats
 IGNORED_USERS = ["Nightbot", "StreamElements"]
+# Add near the top with other configuration constants
+POINTS_PER_777 = 0.5  # Points earned per 777 message
+MAX_777_POINTS_PER_DAY = 5.0  # Maximum points from 777s per day
+MAX_777_PER_DAY = int(MAX_777_POINTS_PER_DAY / POINTS_PER_777)  # Auto-calculate max 777s per day
+
 
 # Restream configuration
-RESTREAM_WEBSOCKET_URL = "wss://chat.restream.io/embed/ws"  # Updated to match embed URL format
+RESTREAM_WEBSOCKET_URL = "wss://chat.restream.io/embed/ws"
 RESTREAM_EVENT_SOURCES = {
     2: "Twitch",
     13: "YouTube",
     28: "X/Twitter"
 }
 
-# Chat prompts
-CHAT_PROMPT = """You are Moon Dev's Live Stream Chat AI Agent. Keep all responses short.
+
+# Chat prompts - for responding to message
+CHAT_PROMPT = """
+
+You are Moon Dev's Live Stream Chat AI Agent. Keep all responses short.
 Keep responses concise, friendly, and include emojis.
 
 YOU ARE THE CHAT MODERATOR OF A LIVE STREAM ABOUT CODING.
 
 Knowledge Base:
-{knowledge_base}
+Frequently Asked Questions
+* how/where do i get started with algo trading? moondev.com has a algo trading roadmap, resources, discord and github
+* when do you live stream? daily at 8am est
+* how you get point for bootcamp? what are points used for? the person with the most points at the end of each's days stream gets the algo trade camp for free for 1 month
+* what do points do? the person who gets the most points on the live stream gets the algo trade camp for free for a month
+* what is 777 peace and love. i believe you can have anything in this world if you lead with love, so while i share absolutely every line of code on youtube, i get a lot of negative energy thrown at me. its the only downside of sharing. sending a 777 is an easy way to send some good vibes to not only me, but everyone reading the comments. lead with love and kindness and you can have anything in this world. imo.
+* what is the best coding language to learn for algo trading?python because its the most widely used language, it isn't too hard to learn and there are so many amazing tutorials and python packages to help you with your journey. once you learn python, learning a second language, if needed is not going to be that hard. i use 100% python in my systems.
+* where to learning coding for algo trading?i teach how to code in my algo trade camp here but you can also learn python on youtube
+* do you prefer trading crypto vs forex or stocks? why?i personally like crypto as i am a fan of decentralization but imo, markets are markets and algo trading can be done with futures, stocks, crypto, prediction markets & any other market that gives you api access
+* what is 777? peace and love. i believe you can have anything in this world if you lead with love, so while i share absolutely every line of code on youtube, i get a lot of negative energy thrown at me. its the only downside of sharing. sending a 777 is an easy way to send some good vibes to not only me, but everyone reading the comments. lead with love and kindness and you can have anything in this world. imo.
+* do you run your bots on your computer? how do you run them 24/7?when getting started i used to run them on my computer but now for scaling, i use a vps provided by cherry servers. there are a ton of vps providers out there, pick your favorite. that said, i am a big believer in staying away from live trading until you have a bunch of proven backtests. i cover this in the rbi system here
+* whats the bootcamps refund policy?We want to make sure that every customer is extremely happy with their decision to join the bootcamp so we offer a 30 day, no questions asked refund policy. Simply email us and we will refund your money immediately through stripe, our payment processor. We want to ensure your experience is amazing and if for any reason you don't 100% enjoy the bootcamp, we stand behind our 30 day, 100% guarantee. You can contact us and we will refund you in less than 2-24 hours. Email: moon@algotradecamp
+* why don't you believe in trading by hand?while i know there is a small percentage of traders who are profitable from hand trading, it wasn't for me. emotions would always get in the way atleast one day a month and when trading size, that one day can screw up a whole months work. i believe in working things that can compound. sitting in front of the charts, guessing price direction doesnt compound. coding backtests and researching new edges, does. this is why i believe if you are going to trade, you should do it algorithmically or not do it at all.
+* do you need a computer science degree for this?no you dont need a computer science degree to learn how to code. youtube is the best place on earth, you can learn anything. i didn't go to college for coding, i learned to code after 30 years old from focusing for 4 hours per day, watching youtube python tutorials. you got this.
+* how do i start the algo trading journey? if i get the bootcamp for a month, will it be enough?you can start by consuming this free resource and roadmap, along with my youtube. if you want me to hold your hand in short, concise videos, you can join the bootcamp. one month will be enough to consume the whole bootcamp. dependent on your experience, one month may be enough. regardless, join and see. you can always cancel after a month.
+* can you talk about the profitability of algo trading?not really, as i don't know your strategy and approach to the market. in algo trading, no one will ever share their edge. if you see someone online trying to sell you a bot that is "plug and play" its a scam. its just math, if everyone was running the same strategy, the profits would go to 0. i can teach you how to automate your trading, where to look for strategies and how to backtest them, but i can't speak on profitability since i don't know your strategy.
+* whats your opinion on machine learning in trading?everyone wants to predict price with machine learning but after a bunch of tests, i don't think that is the way. instead i think it comes down to predicting other things like market regime or when to run a certain strategy. i definitely think there is room for ML in trading, just approached differently, cause if everyone is predicting price, the price wont be the price anymore.
+* can you give me a rundown of what each section of your screen is showing?
+* yes, during my stream you can see many data sources that i watch all day. from left to right: crypto orders up to $15k size, liquidations, massive liquidations ($300k min), bigger orders, and on far right is the top 10 tokens and their change in the last 60 mins. all of these data sources are stored and i can use them in my algos and backtesting. some of these are connected to sound as well, explained below.
+* what strategy do you suggest starting with?i'm not a financial advisor, so i can't suggest anything. the one suggestion i do have, is stop trading by hand, because you will slowly lose all of your money. i understand some traders are profitable by hand, but most will have at least 1 day out of each they are on 'tilt' and will eventually lose all their money. i can't suggest any strategies as this is not financial advice but i can suggest stepping away from hand trading, even if you don't want to automate it
+* what are the sounds going off on your stream?on my stream i have sounds connected to different market conditions. i am exploring the thought of connecting sounds to market actions. for example: when the market is slightly up in the last 60 mins, you may hear birds chirping. if it is down bad, it may sound like we are in the middle of the ocean getting pummeled by waves. if someone gets liquidated you may hear a dong, or a chopper coming through to pick up their body. listen closely and you will be able to know whats going on in the markets just by the sounds.
+* why cant i just buy a bot from you or someone else?im very skeptical of buying bots on the internet. i think its just math that if someone is selling a bot with a specific strategy, that strategy will eventually go to 0. i dont suggest you or anyone else ever buy a bot. if you want to automate your trading, it has to be w/ your strategy that's why i prefer teaching now to automate, opposed to selling bots.
+* can you share your PnL?no, i don't share pnl as i share all of my code on youtube, i don't want someone to think they can just copy my code and make a million dollars over night. this is the hardest game in the world and i don't want to attract get rich quickers. this is a long, hard game & most wont make it. you must build your own edge. if everyone runs the same algos, they mathematically will go to 0
+* what do i need to download to start coding in python?visual studio code or cursor. cursor is new to me, but it is a copy of visual studio code with ai inside it.
+* do you do market orders or limit orders?i try to use limit orders as much as possible, but some strategies require market orders. i use market orders more often on the close than the open of a trade as most of my bots can wait to enter, but sometimes need to get out in a hurry.
+* how can i get in touch with you (moon dev)?the best way is to catch me on a live stream. if its about business you can send me a short email at moon@algotradecamp.com i can't get back to everyone, so please pitch short and concisely
+* can you build a bot for me?probably not, i code live every day on youtube so i can show my code to as many people as possible to help them. if you have a project that you'd like to hire me to do & are ok with some of it being shown on youtube, feel free to email me here: moon@algotradecamp.comi would much rather teach you how to fish, opposed to just giving you a meal. that's why i teach how to automate your trading in the bootcamp
+* can i have a discount?i've spent nearly 4 years testing & figuring out things. i believe code is the great equalizer so there already is a steep discount. i believe i could sell this bootcamp for 10x the price, minimum.if you really can't afford it, i would suggest checking out the #clips channel in discord so you can get the bootcamp for free, while learning.
+* how often is the bootcamp updated?the bootcamp is updated every time i find something new that helps me. the idea is to constantly share new things i figure out inside of the bootcamp members area. i stream on youtube every day and work on the hardest problems and then at the end of the week i update the bootcamp. there are usually 2-4 updates per month.
+* is the bootcamp for advanced coders only?no way! i built this bootcamp because i believe code is the great equalizer. i teach you exactly how to code in python, and then teach you how to algo trade. check out the testimonials, there are students who have never coded before and others who have coded for 10+ years. the bootcamp will save everyone interested in algo trading an unbelievable amount of time.
+* can i learn only from your youtube channel?yes, absolutely. i believe code is the great equalizer so every day i create "over the shoulder" type coding videos. i have over 969 hours of coding videos free on my youtube so you can watch them all and essentially know what i know. that was the whole point of the youtube channel. many people kept asking for a course with short and concise videos and all my code, so i launched the algo trade camp but i still want to build the youtube into the best public good about algo trading
+* why do you teach algo trading?because i believe code is the great equalizer, if you learn how to code, you know a language that 99% of the population doesn't. and that language controls the current world, and the future ai world. that language is python, which is a coding language. people always talk about the threat of ai and the chances it will take over. the decision for me to learn to code was easy, i wanted to be able to control the ai in the future if that worse case scenario were to happen. but tbh, i spent 10+ years in tech, scared to learn to code. it seemed too hard, after a few failed attempts, i just gave it up until i was faced with an urgent problem several years later. i had success in tech that gave me a nice portfolio to trade, but that trading quickly led me to the realization, me a human shouldnt be dealing with these daily emotions and a robot should be trading for me. a robot had to be trading for me, or i would lose all my hard earned money. i met someone who was algo trading a big amount and i was instantly inspired to become an algo trader. problem was i didn't know how to code and had just turned 30, i was too old to learn a new skill lol. 4 hours per day and a few months later, i had learned. i also quickly discovered no one shares algo trading info as they dont want to leak their edge. since it took me 10+ years and a huge problem to get me to learn to code, and seeing the power i now have, being able to build anything i can dream of i had to fire up a mic and show this to others. i believe in abundance, finance is scarcity led. most traders fail at trading, i knew i couldnt do the same thing as others. so i learned to code, now i show every step of the way on youtube because i hope to inspire traders to not trade by hand, and everyone else to learn how to code. because if you learn to code, you have a skill to build anything and to literally build your future. i wish i would have learned to code earlier
+* how did you get started with coding?i spent multiple years hiring developers to build apps & saas for me, thinking i could never code myself. once i wanted to automate my trading, i knew i had to learn how to code to iterate to success. no one has a profitable bot off the bat, and i knew it would be too costly to iterate to success with a developer. so i started learning how to code in python, 4 hours per day, using free youtube videos and documentation. the algo trading industry is super secretive though, so there wasn't much info on how to build trading bots so once i understood how, i just started to show literally every thing i do on youtube. i believe code is the great equalizer, and it took me til 30 years old to start the journey of learning to code but now i believe i can build anything in this world. thats why i believe code is the great equalizer, cause if you know how to code, you can build anything for the rest of your life.
+* can i have the bootcamp for free?We have many lengthy videos on our YouTube channel that need concise clips of the key points. To earn free access to the bootcamp, check out the clips channel in our Discord. There, you can learn how to study our YouTube videos and extract the most valuable segments.
+* can i pay for the bootcamp in crypto?yes, if you are looking to sign up for the lifetime package. unfortunately, there is no way to collect subscriptions in crypto so we do lifetime only. you can email moon@algotradecamp.com for the address to send crypto to set up your bootcamp account.
+refunds- We have a cosmic level 90 day money back guarantee, just email moon@algotradecamp.com to request a refund if you are not satisfied with any purchase
+Bootcamp members have access to our expert coders who can answer any of your questions throughout your journey Join the bootcamp where i show you step by step how to automate your trading.
+the process of automating your trading starts with research of trading strategies, then backtest those strategies to see if they actually work in the past. if they do, they are not guaranteed, but much more likely to work in the future.
+RBI - Research, Backtest, Implement
+Research: research trading strategies and alpha generation techniques (google scholar, books, podcasts, youtube)
+Backtest: use ohlcv data in order to backtest the strategy
+Implement: if the backtest is profitable, implement into a trading bot with tiny size & scale slowly
 
-If the message is NOT in English:
-1. First understand what they're saying
-2. Respond in English in a way that makes sense given their message
-3. Keep the response friendly and conversational
+
+If the message is NOT in English respond in their language and then translate both the message and response.
 
 If the message IS in English:
-Just respond with a friendly message including emojis.
+Just respond with a friendly message including emojis with your knowledge above
 
 IMPORTANT: 
-- All responses must be very short and concise (under 50 tokens)
-- Use knowledge base to answer questions about Moon Dev accurately
 - If unsure about something, say "I'll let Moon Dev answer that! 🌙"
 - Never share API keys or sensitive information
 - Keep the good vibes going with emojis! 😊
+- FULL SENTENCES ONLY!!!!
+
+REMEMBER YOU ARE AN AI AGENT IN THE MOON DEV CODING LIVE STREAM AND YOUR GOAL IS TO RESPOND TO THE QUESTIONS COMING IN
 """
 
-NEGATIVITY_CHECK_PROMPT = """You are a content moderator. Analyze this message for negativity, toxicity, or harmful content.
-Consider hate speech, insults, excessive profanity, threats, or any form of harmful behavior.
+# Update the negativity check prompt to be simpler
+NEGATIVITY_CHECK_PROMPT = """You are a content moderator. Your ONLY job is to identify negative messages.
+Reply with ONLY the word 'true' or 'false'.
+
+A message is negative if it contains:
+- Insults (like "suck", "wack", "trash", etc)
+- Personal attacks
+- Hostile language
+- Criticism
+- Negative tone
 
 Message: {message}
+Is this message negative? Reply with ONLY 'true' or 'false':"""
 
-Rate the negativity from 0.0 to 1.0 where:
-0.0 = Completely positive/neutral
-1.0 = Extremely negative/toxic
+PROMPT_777 = """
 
-Respond with only a number between 0.0 and 1.0.
-"""
+send back a motivational bible verse
 
-PROMPT_777 = """Send back a different bible verse about persistence, perseverance, or hard work.
-Choose from verses about:
-- Not giving up
-- Staying strong
-- Working hard
-- Keeping faith
-- Enduring challenges
-- Being patient
-- Trusting the journey
-- Reaping rewards
-- Standing firm
-- Moving forward
-
-Pick a different verse each time, not just Galatians 6:9.
-Keep the response under 50 tokens total.
+Pick a different verse each time
 Send only the verse, no other text.
 
-Example verses (don't use these exact ones, find similar ones):
-- James 1:12
-- Philippians 3:14
-- Isaiah 40:31
-- Romans 5:3-4
-- 2 Thessalonians 3:13
-
-send back the actual verse
+send back the actual verse in FULL. SEND BACK FULL VERSE
 """
 
 # Add new constants for emojis
 USER_EMOJIS = ["👨🏽", "👨🏽", "🧑🏽‍🦱", "👨🏽‍🦱", "👨🏽‍🦳", "👱🏽‍♂️", "👨🏽‍🦰", "👩🏽‍🦱"]
 AI_EMOJIS = ["🤖", "🐳", "🐐", "👽", "🧠", "🌚"]
-CLOWN_SPAM = "🤡" * 5  # 9 clown emojis for negative messages
-
 # Add lucky emojis for 777 responses
 LUCKY_EMOJIS = ["⭐️", "🧠", "😎", "♥️", "💙", "💚", "😇", "🌟", "✨", "💫", "❤️‍🔥"]
 
 # Configuration
-QUOTA_BACKOFF_BASE = 2  # Base for exponential backoff
-QUOTA_BACKOFF_MAX = 3600  # Maximum backoff of 1 hour
-
-# Add new constants for emojis
-LEADERBOARD_EMOJIS = ["🥇", "🥈", "🥉"]
+MESSAGE_COOLDOWN = 3  # Reduce from 10 to 3 seconds
 
 # Update config defaults
 DEFAULT_CONFIG = {
@@ -174,308 +184,11 @@ DEFAULT_CONFIG = {
 
 # Add to configuration section
 DEBUG_MODE = True  # Add this near other constants
-MESSAGE_COOLDOWN = 3  # Reduce from 10 to 3 seconds
 
-class ChatScraper:
-    """Fallback scraper for when API quota is exceeded"""
-    def __init__(self):
-        """Initialize the scraper with robust Chrome options"""
-        try:
-            chrome_options = Options()
-            chrome_options.add_argument("--headless=new")  # Updated headless mode
-            chrome_options.add_argument("--no-sandbox")
-            chrome_options.add_argument("--disable-dev-shm-usage")
-            chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_argument("--window-size=1920,1080")
-            chrome_options.add_argument("--disable-notifications")
-            chrome_options.add_argument("--disable-popup-blocking")
-            chrome_options.add_argument("--disable-extensions")
-            chrome_options.add_argument("--disable-infobars")
-            chrome_options.add_argument("--remote-debugging-port=9222")
-            chrome_options.add_argument("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-            
-            cprint("🚀 Initializing Chrome driver with enhanced options...", "cyan")
-            self.driver = webdriver.Chrome(options=chrome_options)
-            self.last_messages = set()
-            cprint("✅ Chrome driver initialized successfully!", "green")
-        except Exception as e:
-            cprint(f"❌ Error initializing Chrome driver: {str(e)}", "red")
-            raise
-        
-    def get_live_stream_url(self, channel_id):
-        """Get the current live stream URL with enhanced error handling"""
-        try:
-            channel_url = f"https://www.youtube.com/channel/{channel_id}/live"
-            cprint(f"🔍 Navigating to: {channel_url}", "cyan")
-            
-            self.driver.get(channel_url)
-            time.sleep(5)  # Give page time to load
-            
-            # Wait for either chat or a specific element that indicates no live stream
-            try:
-                chat_present = WebDriverWait(self.driver, 10).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "yt-live-chat-app, #content"))
-                )
-                
-                # Check if we're actually on a live stream
-                current_url = self.driver.current_url
-                if "/live" in current_url or "/watch" in current_url:
-                    cprint(f"✨ Found live stream!", "green")
-                    return current_url
-                else:
-                    cprint("❌ Channel is not live", "yellow")
-                    return None
-                    
-            except selenium.common.exceptions.TimeoutException:
-                cprint("⏳ Timed out waiting for live stream elements", "yellow")
-                return None
-                
-        except Exception as e:
-            cprint(f"❌ Error getting live stream URL: {str(e)}", "red")
-            # Try to recover by reinitializing the driver
-            try:
-                self.driver.quit()
-                chrome_options = Options()
-                chrome_options.add_argument("--headless=new")
-                chrome_options.add_argument("--no-sandbox")
-                self.driver = webdriver.Chrome(options=chrome_options)
-            except:
-                pass
-            return None
-            
-    def get_chat_messages(self):
-        """Scrape chat messages using Selenium with improved selectors"""
-        try:
-            # Wait for chat frame to be present
-            chat_frame = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "iframe#chatframe"))
-            )
-            
-            # Switch to chat frame
-            self.driver.switch_to.frame(chat_frame)
-            
-            # Wait for chat container with better selector
-            chat_container = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "yt-live-chat-item-list-renderer"))
-            )
-            
-            # Get all message elements with more specific selector
-            all_messages = chat_container.find_elements(By.CSS_SELECTOR, "#items yt-live-chat-text-message-renderer")
-            
-            # Process messages - get all new ones since last check
-            new_messages = []
-            
-            # If this is first run, get exactly DEFAULT_INITIAL_CHATS messages from the end
-            if not self.last_messages:  # If this is first run
-                messages_to_process = all_messages[-DEFAULT_INITIAL_CHATS:] if len(all_messages) > DEFAULT_INITIAL_CHATS else all_messages
-                cprint(f"📥 Found {len(messages_to_process)} initial messages", "cyan")
-            else:
-                # Otherwise just check last few for new ones
-                messages_to_process = all_messages[-5:]  # Check last 5 for new messages
-                
-            for msg in messages_to_process:
-                try:
-                    author = msg.find_element(By.CSS_SELECTOR, "#author-name").text
-                    content = msg.find_element(By.CSS_SELECTOR, "#message").text
-                    msg_id = f"{author}:{content}"
-                    
-                    if msg_id not in self.last_messages:
-                        self.last_messages.add(msg_id)
-                        new_messages.append({
-                            'user': author,
-                            'message': content,
-                            'timestamp': datetime.now()
-                        })
-                        
-                        # Keep set size manageable
-                        if len(self.last_messages) > 100:
-                            self.last_messages.clear()
-                except Exception as e:
-                    cprint(f"⚠️ Error processing message: {str(e)}", "yellow")
-                    continue
-            
-            # Switch back to default content
-            self.driver.switch_to.default_content()
-            return new_messages  # Already in chronological order
-            
-        except Exception as e:
-            cprint(f"❌ Error scraping chat: {str(e)}", "red")
-            try:
-                self.driver.switch_to.default_content()
-            except:
-                pass
-            return []
-            
-    def close(self):
-        """Clean up resources"""
-        try:
-            self.driver.switch_to.default_content()  # Make sure we're out of any frames
-            self.driver.quit()
-        except:
-            pass
+# Update constants at the top
+LOVE_EMOJIS = ["❤️", "💖", "💝", "💗", "💓", "💞", "💕", "💘", "💟", "💌", "🫶", "💝", "💖", "💗"]
+LOVE_SPAM = " ".join(random.sample(LOVE_EMOJIS, 6))  # Random selection of love emojis
 
-class YouTubeChatMonitor:
-    def __init__(self, api_key):
-        """Initialize YouTube chat monitor"""
-        self.api_key = api_key
-        self.youtube = build(
-            "youtube",
-            "v3",
-            developerKey=api_key
-        )
-        self.live_chat_id = None
-        self.next_page_token = None
-        self.last_message_time = datetime.now()
-        self.last_live_check = None
-        self.video_id = None
-        self.using_fallback = SELENIUM_AS_DEFAULT  # Initialize with default setting
-        self.scraper = ChatScraper() if SELENIUM_AS_DEFAULT else None  # Create scraper if using Selenium by default
-        
-    def _init_fallback(self):
-        """Initialize fallback scraper"""
-        if not self.scraper and USE_FALLBACK:
-            cprint("🔄 API quota exceeded - switching to Selenium fallback...", "yellow")
-            self.scraper = ChatScraper()
-            self.using_fallback = True
-            
-    def get_live_chat_id(self, channel_id):
-        """Get live chat ID with fallback methods"""
-        try:
-            # Try API first if not already using fallback
-            if not self.using_fallback:
-                try:
-                    chat_id = self._get_chat_id_api(channel_id)
-                    if chat_id:
-                        return chat_id
-                except HttpError as e:
-                    if "quota" in str(e).lower():
-                        cprint("\n🔄 YouTube API quota exceeded!", "yellow")
-                        cprint("🚀 Switching to Selenium fallback mode...", "cyan")
-                        self._init_fallback()
-                    else:
-                        raise
-            
-            # Try Selenium fallback
-            if self.using_fallback:
-                if not self.scraper:
-                    self._init_fallback()
-                url = self.scraper.get_live_stream_url(channel_id)
-                if url:
-                    cprint(f"✨ Successfully connected to live stream via Selenium!", "green")
-                    cprint(f"🔗 Stream URL: {url[:60]}...", "cyan")
-                    return "fallback"
-                else:
-                    cprint("❌ No live stream found via Selenium", "yellow")
-                    
-            return None
-            
-        except Exception as e:
-            if "quota" in str(e).lower() and not self.using_fallback:
-                cprint("\n🔄 YouTube API quota exceeded!", "yellow")
-                cprint("🚀 Switching to Selenium fallback mode...", "cyan")
-                self._init_fallback()
-                # Retry immediately with fallback
-                return self.get_live_chat_id(channel_id)
-            else:
-                cprint(f"❌ Error getting live chat ID: {str(e)}", "red")
-            return None
-            
-    def get_chat_messages(self):
-        """Get chat messages with fallback methods"""
-        if not self.using_fallback:
-            try:
-                return self._get_messages_api()
-            except HttpError as e:
-                if "quota" in str(e).lower():
-                    self._init_fallback()
-                else:
-                    raise
-                    
-        if self.using_fallback:
-            return self.scraper.get_chat_messages()
-            
-        return []
-        
-    def _get_chat_id_api(self, channel_id):
-        """Get live chat ID using YouTube API"""
-        try:
-            # Search for active live stream
-            request = self.youtube.search().list(
-                part="id",
-                channelId=channel_id,
-                eventType="live",
-                type="video",
-                fields="items/id/videoId",
-                maxResults=1
-            )
-            response = request.execute()
-            
-            if response.get('items'):
-                self.video_id = response['items'][0]['id']['videoId']
-                cprint(f"✨ Found live stream: {self.video_id}", "cyan")
-                
-                # Get chat ID for found video
-                request = self.youtube.videos().list(
-                    part="liveStreamingDetails",
-                    id=self.video_id,
-                    fields="items/liveStreamingDetails/activeLiveChatId"
-                )
-                response = request.execute()
-                
-                if response.get('items'):
-                    chat_id = response['items'][0].get('liveStreamingDetails', {}).get('activeLiveChatId')
-                    if chat_id:
-                        cprint(f"🎯 Found active live chat! ID: {chat_id[:20]}...", "green")
-                        return chat_id
-                        
-            return None
-            
-        except HttpError as e:
-            if "quota" in str(e).lower():
-                raise  # Re-raise quota error to trigger fallback
-            cprint(f"❌ Error in API chat ID lookup: {str(e)}", "red")
-            return None
-            
-    def _get_messages_api(self):
-        """Get messages using YouTube API"""
-        if not self.live_chat_id:
-            return []
-            
-        try:
-            request = self.youtube.liveChatMessages().list(
-                liveChatId=self.live_chat_id,
-                part="snippet,authorDetails",
-                pageToken=self.next_page_token,
-                maxResults=DEFAULT_INITIAL_CHATS  # Use config value instead of hardcoded 3
-            )
-            response = request.execute()
-            
-            self.next_page_token = response.get('nextPageToken')
-            
-            if not response.get('items'):
-                return []
-                
-            messages = []
-            for item in response['items']:
-                messages.append({
-                    'user': item['authorDetails']['displayName'],
-                    'message': item['snippet']['displayMessage'],
-                    'timestamp': datetime.strptime(
-                        item['snippet']['publishedAt'].split('.')[0] + 'Z',
-                        '%Y-%m-%dT%H:%M:%SZ'
-                    )
-                })
-                
-            return messages
-            
-        except Exception as e:
-            cprint(f"❌ Error getting API messages: {str(e)}", "red")
-            return []
-            
-    def __del__(self):
-        """Clean up resources"""
-        if self.scraper:
-            self.scraper.close()
 
 class RestreamChatHandler:
     """Handler for Restream chat integration"""
@@ -486,8 +199,9 @@ class RestreamChatHandler:
         self.connected = False
         self.message_class = None
         self.chat_agent = None
-        self.last_processed_time = 0
-        self.message_queue = []
+        self.message_queue = []  # List of (timestamp, username, text) tuples
+        self.message_timeout = 2  # Reduce timeout to 2 seconds
+        self.last_message = None  # Track the last message we processed
         
         # Initialize Selenium options
         self.chrome_options = Options()
@@ -501,8 +215,8 @@ class RestreamChatHandler:
         self.chrome_options.add_argument("--disable-software-rasterizer")
         self.chrome_options.add_argument("--disable-extensions")
         
-        # Single set for all processed messages
-        self.processed_messages = set()
+        # Simplify message tracking to just the last message content
+        self.last_message_content = None
         
     def set_chat_agent(self, agent):
         """Set reference to ChatAgent for processing questions"""
@@ -580,84 +294,102 @@ class RestreamChatHandler:
         while self.connected:
             try:
                 if not self.message_class:
-                    time.sleep(1)
+                    time.sleep(0.1)
+                    continue
+
+                messages = self.driver.find_elements(By.CLASS_NAME, "message-info-container")
+                if not messages:
                     continue
                     
-                messages = self.driver.find_elements(By.CLASS_NAME, "message-info-container")
+                # Get the last message
+                latest_msg = messages[-1]
                 
-                # Process only messages we haven't seen
-                for msg in messages[-10:]:  # Only look at last 10 messages
-                    try:
-                        username = msg.find_element(By.CLASS_NAME, "message-sender").text.strip()
-                        text = msg.find_element(By.CLASS_NAME, "chat-text-normal").text.strip()
+                try:
+                    # Get username first and validate
+                    username = latest_msg.find_element(By.CLASS_NAME, "message-sender").text.strip()
+                    
+                    # Skip if no username or empty username
+                    if not username:
+                        continue
                         
-                        # Create unique message ID
-                        msg_id = f"{username}:{text}"
-                        
-                        # Skip if we've ever seen this message before
-                        if msg_id in self.processed_messages:
-                            continue
-                            
+                    text = latest_msg.find_element(By.CLASS_NAME, "chat-text-normal").text.strip()
+                    
+                    # Create unique message content identifier
+                    current_content = f"{username}:{text}"
+                    
+                    # Only process if this is a new message and has valid username
+                    if current_content != self.last_message_content and username:
                         # Skip system messages
                         if username == "Restream.io" or not text:
                             continue
                             
-                        # Add to processed messages - never remove from this set
-                        self.processed_messages.add(msg_id)
-                        
-                        # Display chat message and process response
-                        print(f"{random.choice(USER_EMOJIS)} ", end="")
-                        cprint(username, "white", "on_blue", end="")
-                        print(f": {text}")
-                        
-                        # Process AI response
+                        # Process message
                         if self.chat_agent:
                             ai_response = self.chat_agent.process_question(username, text)
                             if ai_response:
-                                # If it's a 777 response, display with cyan background
-                                if text.strip() == "777":
-                                    print(f"{random.choice(AI_EMOJIS)} ", end="")
-                                    cprint("Moon Dev AI", "white", "on_green", end="")
-                                    print(": ", end="")
-                                    cprint(ai_response, "white", "on_cyan")
-                                else:
-                                    print(f"{random.choice(AI_EMOJIS)} ", end="")
-                                    cprint("Moon Dev AI", "white", "on_green", end="")
-                                    print(f": {ai_response}")
-                                print()  # Add spacing
-                        
-                    except Exception as e:
-                        cprint(f"⚠️ Error processing message: {str(e)}", "yellow")
-                        continue
-                        
-                time.sleep(0.5)  # Poll frequently
+                                self._display_chat(username, text, ai_response)
+                                
+                        # Update last message content after successful processing
+                        self.last_message_content = current_content
+                    
+                except Exception as e:
+                    cprint(f"⚠️ Error processing message: {str(e)}", "yellow")
+                    continue
+
+                time.sleep(0.1)
                 
             except Exception as e:
                 cprint(f"❌ Error polling messages: {str(e)}", "red")
-                time.sleep(1)
+                time.sleep(0.1)
 
     def __del__(self):
         """Clean up resources"""
         if self.driver:
             self.driver.quit()
 
+    def _display_chat(self, username, text, ai_response):
+        """Display chat with colored formatting"""
+        formatted_username = username.strip()
+        
+        # For negative messages, ONLY show username and love emojis
+        if ai_response == LOVE_SPAM:
+            print(f"{random.choice(USER_EMOJIS)} ", end="")
+            cprint(formatted_username, "white", "on_blue", end="")
+            print(f" {LOVE_SPAM}")
+            print()  # Add spacing
+            return  # Important: return here to prevent showing the message
+        
+        # For normal messages, show full chat
+        print(f"{random.choice(USER_EMOJIS)} ", end="")
+        cprint(formatted_username, "white", "on_blue", end="")
+        print(f": {text}")
+        
+        # Display AI response
+        if ai_response:
+            # If it's a 777 response, display with cyan background
+            if text.strip() == "777":
+                print(f"{random.choice(AI_EMOJIS)} ", end="")
+                cprint("Moon Dev AI", "white", "on_green", end="")
+                print(": ", end="")
+                cprint(ai_response, "white", "on_cyan")
+            else:
+                print(f"{random.choice(AI_EMOJIS)} ", end="")
+                cprint("Moon Dev AI", "white", "on_green", end="")
+                print(f": {ai_response}")
+            print()  # Add spacing
+
 class ChatAgent:
     def __init__(self):
         """Initialize the Chat Agent"""
         cprint("\n🤖 Initializing Moon Dev's Chat Agent...", "cyan")
         
-        # Create data directories
+        # Remove knowledge base initialization
         self.data_dir = Path(project_root) / "src" / "data" / "chat_agent"
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.knowledge_base_path = self.data_dir / "knowledge_base.txt"
         self.chat_log_path = self.data_dir / "chat_history.csv"
         
         # Initialize chat memory
         self.chat_memory = []
-        
-        # Create knowledge base if it doesn't exist
-        if not self.knowledge_base_path.exists():
-            self._create_knowledge_base()
         
         # Create chat log if it doesn't exist
         if not self.chat_log_path.exists():
@@ -683,63 +415,37 @@ class ChatAgent:
         self.chat_count_since_last_leaderboard = 0
         self.leaderboard_chat_interval = LEADERBOARD_INTERVAL  # Use the constant we defined (10)
         
-        # Initialize appropriate chat system
-        if USE_RESTREAM:
-            cprint("\n🔄 Attempting to initialize Restream...", "cyan")
-            restream_id = os.getenv("RESTREAM_CLIENT_ID")
-            restream_secret = os.getenv("RESTREAM_CLIENT_SECRET")
+        # Initialize Restream handler
+        cprint("\n🔄 Initializing Restream...", "cyan")
+        restream_id = os.getenv("RESTREAM_CLIENT_ID")
+        restream_secret = os.getenv("RESTREAM_CLIENT_SECRET")
+        
+        if not restream_id or not restream_secret:
+            cprint("❌ Missing Restream credentials in .env!", "red")
+            raise ValueError("Missing Restream credentials!")
             
-            if not restream_id or not restream_secret:
-                cprint("❌ Missing Restream credentials in .env!", "red")
-                raise ValueError("Missing Restream credentials!")
-                
-            self.restream_handler = RestreamChatHandler(restream_id, restream_secret)
-            self.restream_handler.set_chat_agent(self)  # Set reference to ChatAgent
-            self.restream_handler.connect()
-            cprint("🎮 Restream chat integration enabled!", "green")
-            self.youtube_monitor = None
-        else:
-            youtube_api_key = os.getenv("YOUTUBE_API_KEY")
-            if not youtube_api_key:
-                raise ValueError("🚨 YOUTUBE_API_KEY not found in .env!")
-            self.youtube_monitor = YouTubeChatMonitor(youtube_api_key)
-            self.restream_handler = None
+        self.restream_handler = RestreamChatHandler(restream_id, restream_secret)
+        self.restream_handler.set_chat_agent(self)
+        self.restream_handler.connect()
+        cprint("🎮 Restream chat integration enabled!", "green")
         
         cprint("🎯 Moon Dev's Chat Agent initialized!", "green")
         
-    def _create_knowledge_base(self):
-        """Create initial knowledge base file"""
-        initial_knowledge = """# 🌙 Moon Dev's Knowledge Base
-
-## About Moon Dev
-- Passionate about AI, trading, and coding
-- Loves adding emojis to everything
-- Streams coding sessions on YouTube
-- Built multiple AI trading agents
-
-## Projects
-- Focus Agent: AI that monitors focus during streams
-- Trading Agents: Various AI-powered trading bots
-- Model Factory: Unified interface for multiple AI models
-
-## Preferences
-- Favorite Language: Python
-- Coding Style: Clean, well-documented, with lots of emojis
-- Trading Style: AI-assisted with risk management
-
-## Common Commands
-- !focus - Check current focus level
-- !trade - Check trading status
-- !help - List available commands
-"""
-        self.knowledge_base_path.write_text(initial_knowledge)
-        cprint("📚 Created initial knowledge base!", "green")
+        # Add tracking for 777 counts
+        self.daily_777_counts = {}  # Format: {username: {'count': int, 'last_reset': datetime}}
         
     def _create_chat_log(self):
         """Create empty chat history CSV with all required columns"""
-        df = pd.DataFrame(columns=['timestamp', 'user', 'message', 'score'])
-        df.to_csv(self.chat_log_path, index=False)
-        cprint("📝 Created chat history log with all required columns!", "green")
+        try:
+            # Create with all required columns
+            df = pd.DataFrame(columns=['timestamp', 'user', 'message', 'score'])
+            # Ensure directory exists
+            self.chat_log_path.parent.mkdir(parents=True, exist_ok=True)
+            # Save with index=False to avoid extra column
+            df.to_csv(self.chat_log_path, index=False)
+            cprint("📝 Created fresh chat history log!", "green")
+        except Exception as e:
+            cprint(f"❌ Error creating chat log: {str(e)}", "red")
         
     def _announce_model(self):
         """Announce current model with eye-catching formatting"""
@@ -748,10 +454,6 @@ class ChatAgent:
         cprint(border, 'white', 'on_blue', attrs=['bold'])
         cprint(f"  {model_msg}  ", 'white', 'on_blue', attrs=['bold'])
         cprint(border, 'white', 'on_blue', attrs=['bold'])
-        
-    def _load_knowledge_base(self):
-        """Load and return the knowledge base content"""
-        return self.knowledge_base_path.read_text()
         
     def _log_chat(self, user, question, confidence, response):
         """Log chat interaction to CSV silently"""
@@ -797,17 +499,27 @@ class ChatAgent:
         
         return False
 
-    def _display_chat(self, user, message, ai_response):
+    def _display_chat(self, username, text, ai_response):
         """Display chat with colored formatting"""
-        # Display user message
-        print(f"{random.choice(USER_EMOJIS)} ", end="")
-        cprint(user, "white", "on_blue", end="")
-        print(f": {message}")
+        formatted_username = username.strip()
         
-        # Display AI response if we have one
+        # For negative messages, ONLY show username and love emojis
+        if ai_response == LOVE_SPAM:
+            print(f"{random.choice(USER_EMOJIS)} ", end="")
+            cprint(formatted_username, "white", "on_blue", end="")
+            print(f" {LOVE_SPAM}")
+            print()  # Add spacing
+            return  # Important: return here to prevent showing the message
+        
+        # For normal messages, show full chat
+        print(f"{random.choice(USER_EMOJIS)} ", end="")
+        cprint(formatted_username, "white", "on_blue", end="")
+        print(f": {text}")
+        
+        # Display AI response
         if ai_response:
             # If it's a 777 response, display with cyan background
-            if message.strip() == "777":
+            if text.strip() == "777":
                 print(f"{random.choice(AI_EMOJIS)} ", end="")
                 cprint("Moon Dev AI", "white", "on_green", end="")
                 print(": ", end="")
@@ -818,38 +530,89 @@ class ChatAgent:
                 print(f": {ai_response}")
             print()  # Add spacing
 
+    def _get_daily_777_count(self, username):
+        """Get and update the user's daily 777 count"""
+        today = datetime.now().date()
+        
+        if username not in self.daily_777_counts:
+            self.daily_777_counts[username] = {'count': 0, 'last_reset': today}
+            
+        # Check if we need to reset the count for a new day
+        user_data = self.daily_777_counts[username]
+        if user_data['last_reset'] != today:
+            user_data['count'] = 0
+            user_data['last_reset'] = today
+            
+        return user_data['count']
+        
     def process_question(self, user, question):
         try:
-            # Skip messages from ignored users
-            if user in IGNORED_USERS:
-                return None
-                
-            # Special case for "777"
+            # Handle 777 FIRST - skip negativity check for these
             if question.strip() == "777":
+                # Check daily limit and add points
+                daily_count = self._get_daily_777_count(user)
+                if daily_count < MAX_777_PER_DAY:
+                    self.daily_777_counts[user]['count'] += 1
+                    # Save 777 points to history
+                    self.save_chat_history(user, question, POINTS_PER_777)
+                
                 verse_response = self.model.generate_response(
                     system_prompt=PROMPT_777,
                     user_content="777",
-                    temperature=0.9,  # Higher temperature for more variety
+                    temperature=0.9,
                     max_tokens=MAX_RESPONSE_TOKENS
                 )
                 emojis = self._get_random_lucky_emojis()
                 return f"777 {emojis}\n{verse_response.content.strip()}"
             
-            # Get knowledge base content
-            knowledge_base = self._load_knowledge_base()
+            # For all other messages, check negativity first
+            negativity_prompt = NEGATIVITY_CHECK_PROMPT.format(message=question)
+            negativity_response = self.model.generate_response(
+                system_prompt=negativity_prompt,
+                user_content=question,
+                temperature=0.3,
+                max_tokens=5
+            ).content.strip().lower()
             
-            # Format prompt with knowledge base
-            formatted_prompt = CHAT_PROMPT.format(
-                knowledge_base=knowledge_base
-            )
+            # If negative, save negative point and return love emojis
+            if negativity_response == 'true':
+                self.save_chat_history(user, question, -1)  # Negative point for negative messages
+                return LOVE_SPAM
             
-            # For simple questions, use a minimal prompt
-            if len(question.split()) < 5:
-                formatted_prompt = """You are Moon Dev's Live Stream Chat AI Agent. Keep responses short and friendly with emojis."""
+            # Skip messages from ignored users
+            if user in IGNORED_USERS:
+                return None
+                
+            # For normal messages, calculate and save score
+            chat_history = self._get_user_chat_history(user)
+            score = update_chat_score(user, question, chat_history)
+            self.save_chat_history(user, question, score)
+            
+            # Process normal message with our chat prompt
+            formatted_prompt = """You are Moon Dev's Live Stream Chat AI Agent. 
+You help users learn about coding, algo trading, and Moon Dev's content.
+Keep responses short, friendly, and include emojis.
+
+Key points about Moon Dev:
+- Passionate about AI, trading, and coding
+- Streams coding sessions on YouTube
+- Built multiple AI trading agents
+- Loves adding emojis to everything
+- Runs a coding bootcamp
+- Focuses on Python and algo trading
+
+Knowledge Base:
+Frequently Asked Questions
+* how/where do i get started with algo trading? moondev.com has a algo trading roadmap, resources, discord and github
+* when do you live stream? daily at 8am est
+* how you get point for bootcamp? what are points used for? the person with the most points at the end of each's days stream gets the algo trade camp for free for 1 month
+
+User message: {question}
+"""
             
             # Get response from model
             response = self.model.generate_response(
-                system_prompt=formatted_prompt,
+                system_prompt=formatted_prompt.format(question=question),
                 user_content=question,
                 temperature=0.7,
                 max_tokens=MAX_RESPONSE_TOKENS
@@ -903,7 +666,7 @@ class ChatAgent:
             random_bonus = random.choice(bonus_emojis)
             message += f"\n{rank_decorations[i]} {user}: {score} points {random_bonus}"
         
-        message += "\n\n✨ ⭐️ 🌟 ⭐️ 💫 ⭐️ 🌟 ⭐️ ✨"
+        message += "\n\n ⭐️ Winner Gets Free Bootcamp ⭐️ "
         return message.strip()
         
     def _show_leaderboard(self):
@@ -931,75 +694,23 @@ class ChatAgent:
         self._show_leaderboard()
         self.chat_count_since_last_leaderboard = 0
         
-        if USE_RESTREAM:
-            cprint("🎮 Using Restream for chat integration!", "green")
-            if not self.restream_handler:
-                cprint("❌ Restream handler not initialized - check your credentials!", "red")
-                return
-            
+        # Start Restream handler and keep main thread alive
+        try:
             while True:
-                try:
-                    messages = self.restream_handler._poll_messages()
-                    
-                    for msg in messages:
-                        # Process the message
-                        response = self.process_question(msg['user'], msg['message'])
-                        self._display_chat(msg['user'], msg['message'], response)
-                        
-                        # Update leaderboard counter
-                        self.chat_count_since_last_leaderboard += 1
-                        
-                        # Show leaderboard every LEADERBOARD_INTERVAL chats
-                        if self.chat_count_since_last_leaderboard >= LEADERBOARD_INTERVAL:
-                            cprint("\n🏆 Time for the leaderboard!", "cyan")
-                            self._show_leaderboard()
-                            self.chat_count_since_last_leaderboard = 0
-                            print()  # Add spacing after leaderboard
-                    
-                    time.sleep(SELENIUM_CHECK_INTERVAL)
-                    
-                except KeyboardInterrupt:
-                    raise
-                except Exception as e:
-                    cprint(f"❌ Error: {str(e)}", "red")
-                    time.sleep(SELENIUM_CHECK_INTERVAL)
-        else:
-            # YouTube-only code (only runs if not using Restream)
-            cprint("🎥 Using YouTube chat integration!", "green")
-            
-            while True:
-                try:
-                    # Get live chat ID if we don't have one
-                    if not self.youtube_monitor.live_chat_id:
-                        chat_id = self.youtube_monitor.get_live_chat_id(YOUTUBE_CHANNEL_ID)
-                        if chat_id:
-                            self.youtube_monitor.live_chat_id = chat_id
-                            cprint("✅ Connected to YouTube live chat!", "green")
-                        else:
-                            cprint("⏳ Waiting for active live stream...", "yellow")
-                            time.sleep(LIVE_CHECK_INTERVAL)
-                            continue
-                    
-                    # Get and process messages
-                    messages = self.youtube_monitor.get_chat_messages()
-                    
-                    for msg in messages:
-                        response = self.process_question(msg['user'], msg['message'])
-                        self._display_chat(msg['user'], msg['message'], response)
-                        self.chat_count_since_last_leaderboard += 1
-                        
-                        # Show leaderboard if needed
-                        if self.chat_count_since_last_leaderboard >= LEADERBOARD_INTERVAL:
-                            self._show_leaderboard()
-                            self.chat_count_since_last_leaderboard = 0
-                    
-                    time.sleep(CHECK_INTERVAL)
-                    
-                except KeyboardInterrupt:
-                    raise
-                except Exception as e:
-                    cprint(f"❌ Error in YouTube chat: {str(e)}", "red")
-                    time.sleep(CHECK_INTERVAL)
+                time.sleep(RESTREAM_CHECK_INTERVAL)
+                
+                # Show leaderboard every LEADERBOARD_INTERVAL chats
+                if self.chat_count_since_last_leaderboard >= LEADERBOARD_INTERVAL:
+                    #cprint("\n🏆 Time for the leaderboard!", "cyan")
+                    self._show_leaderboard()
+                    self.chat_count_since_last_leaderboard = 0
+                    print()  # Add spacing after leaderboard
+                
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            cprint(f"❌ Error: {str(e)}", "red")
+            time.sleep(RESTREAM_CHECK_INTERVAL)
 
     def _get_user_chat_history(self, username):
         """
@@ -1033,14 +744,19 @@ class ChatAgent:
 def is_meaningful_chat(new_message, chat_history, threshold=0.3):
     """
     🌙 MOON DEV SAYS: Let's keep chats meaningful and fun!
-    Determines if a chat is meaningful based on similarity to previous chats
     """
+    # Ensure new_message is a string
+    new_message = str(new_message)
+    
     if len(new_message.split()) < 3:  # Very short messages
         return False
         
     if not chat_history:
         return True
         
+    # Convert all chat history items to strings
+    chat_history = [str(msg) for msg in chat_history]
+    
     vectorizer = TfidfVectorizer()
     tfidf_matrix = vectorizer.fit_transform(chat_history + [new_message])
     similarities = cosine_similarity(tfidf_matrix[-1], tfidf_matrix[:-1])
@@ -1053,8 +769,10 @@ def is_meaningful_chat(new_message, chat_history, threshold=0.3):
 def evaluate_chat_sentiment(message):
     """
     🌙 MOON DEV SAYS: Let's keep the vibes positive! 🌈
-    Simple sentiment evaluation (can be replaced with more complex AI)
     """
+    # Ensure message is a string
+    message = str(message)
+    
     positive_words = ['great', 'awesome', 'love', 'thanks', 'helpful']
     negative_words = ['hate', 'bad', 'awful', 'terrible', 'useless']
     
@@ -1063,7 +781,6 @@ def evaluate_chat_sentiment(message):
     negative_score = sum(word in message_lower for word in negative_words)
     
     if positive_score > negative_score:
-        #print("🌙 MOON DEV: Positive vibes detected! ")
         return 1
     elif negative_score > positive_score:
         print("🌙 ayo fam lets keep it positive, spam the 777s to increase the vibes in here")
