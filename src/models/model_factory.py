@@ -16,6 +16,7 @@ from .groq_model import GroqModel
 from .openai_model import OpenAIModel
 from .gemini_model import GeminiModel
 from .deepseek_model import DeepSeekModel
+import random
 
 class ModelFactory:
     """Factory for creating and managing AI models"""
@@ -193,6 +194,30 @@ class ModelFactory:
     def is_model_available(self, model_type: str) -> bool:
         """Check if a specific model type is available"""
         return model_type in self._models and self._models[model_type].is_available()
+
+    def generate_response(self, system_prompt, user_content, temperature=0.7, max_tokens=None):
+        """Generate a response from the model with no caching"""
+        try:
+            # Add random nonce to prevent caching
+            nonce = f"_{random.randint(1, 1000000)}"
+            
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"{user_content}{nonce}"}  # Add nonce to force new response
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens if max_tokens else self.max_tokens
+            )
+            
+            return response.choices[0].message
+            
+        except Exception as e:
+            if "503" in str(e):
+                raise e  # Let the retry logic handle 503s
+            cprint(f"❌ Model error: {str(e)}", "red")
+            return None
 
 # Create a singleton instance
 model_factory = ModelFactory() 

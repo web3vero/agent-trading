@@ -51,7 +51,7 @@ CONFIDENCE_THRESHOLD = 0.8
 MAX_RETRIES = 3
 MAX_RESPONSE_TOKENS = 50  # Increase to allow longer responses
 CHAT_MEMORY_SIZE = 30
-MIN_CHARS_FOR_RESPONSE = 30
+MIN_CHARS_FOR_RESPONSE = 3
 DEFAULT_INITIAL_CHATS = 10
 NEGATIVITY_THRESHOLD = 0.3  # Lower this from 0.4 to catch more negative messages
 LEADERBOARD_INTERVAL = 10  # Show leaderboard every 10 chats
@@ -72,94 +72,43 @@ RESTREAM_EVENT_SOURCES = {
 
 
 # Chat prompts - for responding to message
-CHAT_PROMPT = """
+CHAT_PROMPT = """You are Moon Dev's Live Stream Chat AI Agent. 
+You help users learn about coding, algo trading, and Moon Dev's content.
+Keep responses short, friendly, and include emojis.
 
-You are Moon Dev's Live Stream Chat AI Agent. Keep all responses short.
-Keep responses concise, friendly, and include emojis.
-
-YOU ARE THE CHAT MODERATOR OF A LIVE STREAM ABOUT CODING.
+Key points about Moon Dev:
+- Passionate about AI, trading, and coding
+- Streams coding sessions on YouTube
+- Built multiple AI trading agents
+- Loves adding emojis to everything
+- Runs a coding bootcamp
+- Focuses on Python and algo trading
 
 Knowledge Base:
 Frequently Asked Questions
 * how/where do i get started with algo trading? moondev.com has a algo trading roadmap, resources, discord and github
 * when do you live stream? daily at 8am est
 * how you get point for bootcamp? what are points used for? the person with the most points at the end of each's days stream gets the algo trade camp for free for 1 month
-* what do points do? the person who gets the most points on the live stream gets the algo trade camp for free for a month
-* what is 777 peace and love. i believe you can have anything in this world if you lead with love, so while i share absolutely every line of code on youtube, i get a lot of negative energy thrown at me. its the only downside of sharing. sending a 777 is an easy way to send some good vibes to not only me, but everyone reading the comments. lead with love and kindness and you can have anything in this world. imo.
-* what is the best coding language to learn for algo trading?python because its the most widely used language, it isn't too hard to learn and there are so many amazing tutorials and python packages to help you with your journey. once you learn python, learning a second language, if needed is not going to be that hard. i use 100% python in my systems.
-* where to learning coding for algo trading?i teach how to code in my algo trade camp here but you can also learn python on youtube
-* do you prefer trading crypto vs forex or stocks? why?i personally like crypto as i am a fan of decentralization but imo, markets are markets and algo trading can be done with futures, stocks, crypto, prediction markets & any other market that gives you api access
-* what is 777? peace and love. i believe you can have anything in this world if you lead with love, so while i share absolutely every line of code on youtube, i get a lot of negative energy thrown at me. its the only downside of sharing. sending a 777 is an easy way to send some good vibes to not only me, but everyone reading the comments. lead with love and kindness and you can have anything in this world. imo.
-* do you run your bots on your computer? how do you run them 24/7?when getting started i used to run them on my computer but now for scaling, i use a vps provided by cherry servers. there are a ton of vps providers out there, pick your favorite. that said, i am a big believer in staying away from live trading until you have a bunch of proven backtests. i cover this in the rbi system here
-* whats the bootcamps refund policy?We want to make sure that every customer is extremely happy with their decision to join the bootcamp so we offer a 30 day, no questions asked refund policy. Simply email us and we will refund your money immediately through stripe, our payment processor. We want to ensure your experience is amazing and if for any reason you don't 100% enjoy the bootcamp, we stand behind our 30 day, 100% guarantee. You can contact us and we will refund you in less than 2-24 hours. Email: moon@algotradecamp
-* why don't you believe in trading by hand?while i know there is a small percentage of traders who are profitable from hand trading, it wasn't for me. emotions would always get in the way atleast one day a month and when trading size, that one day can screw up a whole months work. i believe in working things that can compound. sitting in front of the charts, guessing price direction doesnt compound. coding backtests and researching new edges, does. this is why i believe if you are going to trade, you should do it algorithmically or not do it at all.
-* do you need a computer science degree for this?no you dont need a computer science degree to learn how to code. youtube is the best place on earth, you can learn anything. i didn't go to college for coding, i learned to code after 30 years old from focusing for 4 hours per day, watching youtube python tutorials. you got this.
-* how do i start the algo trading journey? if i get the bootcamp for a month, will it be enough?you can start by consuming this free resource and roadmap, along with my youtube. if you want me to hold your hand in short, concise videos, you can join the bootcamp. one month will be enough to consume the whole bootcamp. dependent on your experience, one month may be enough. regardless, join and see. you can always cancel after a month.
-* can you talk about the profitability of algo trading?not really, as i don't know your strategy and approach to the market. in algo trading, no one will ever share their edge. if you see someone online trying to sell you a bot that is "plug and play" its a scam. its just math, if everyone was running the same strategy, the profits would go to 0. i can teach you how to automate your trading, where to look for strategies and how to backtest them, but i can't speak on profitability since i don't know your strategy.
-* whats your opinion on machine learning in trading?everyone wants to predict price with machine learning but after a bunch of tests, i don't think that is the way. instead i think it comes down to predicting other things like market regime or when to run a certain strategy. i definitely think there is room for ML in trading, just approached differently, cause if everyone is predicting price, the price wont be the price anymore.
-* can you give me a rundown of what each section of your screen is showing?
-* yes, during my stream you can see many data sources that i watch all day. from left to right: crypto orders up to $15k size, liquidations, massive liquidations ($300k min), bigger orders, and on far right is the top 10 tokens and their change in the last 60 mins. all of these data sources are stored and i can use them in my algos and backtesting. some of these are connected to sound as well, explained below.
-* what strategy do you suggest starting with?i'm not a financial advisor, so i can't suggest anything. the one suggestion i do have, is stop trading by hand, because you will slowly lose all of your money. i understand some traders are profitable by hand, but most will have at least 1 day out of each they are on 'tilt' and will eventually lose all their money. i can't suggest any strategies as this is not financial advice but i can suggest stepping away from hand trading, even if you don't want to automate it
-* what are the sounds going off on your stream?on my stream i have sounds connected to different market conditions. i am exploring the thought of connecting sounds to market actions. for example: when the market is slightly up in the last 60 mins, you may hear birds chirping. if it is down bad, it may sound like we are in the middle of the ocean getting pummeled by waves. if someone gets liquidated you may hear a dong, or a chopper coming through to pick up their body. listen closely and you will be able to know whats going on in the markets just by the sounds.
-* why cant i just buy a bot from you or someone else?im very skeptical of buying bots on the internet. i think its just math that if someone is selling a bot with a specific strategy, that strategy will eventually go to 0. i dont suggest you or anyone else ever buy a bot. if you want to automate your trading, it has to be w/ your strategy that's why i prefer teaching now to automate, opposed to selling bots.
-* can you share your PnL?no, i don't share pnl as i share all of my code on youtube, i don't want someone to think they can just copy my code and make a million dollars over night. this is the hardest game in the world and i don't want to attract get rich quickers. this is a long, hard game & most wont make it. you must build your own edge. if everyone runs the same algos, they mathematically will go to 0
-* what do i need to download to start coding in python?visual studio code or cursor. cursor is new to me, but it is a copy of visual studio code with ai inside it.
-* do you do market orders or limit orders?i try to use limit orders as much as possible, but some strategies require market orders. i use market orders more often on the close than the open of a trade as most of my bots can wait to enter, but sometimes need to get out in a hurry.
-* how can i get in touch with you (moon dev)?the best way is to catch me on a live stream. if its about business you can send me a short email at moon@algotradecamp.com i can't get back to everyone, so please pitch short and concisely
-* can you build a bot for me?probably not, i code live every day on youtube so i can show my code to as many people as possible to help them. if you have a project that you'd like to hire me to do & are ok with some of it being shown on youtube, feel free to email me here: moon@algotradecamp.comi would much rather teach you how to fish, opposed to just giving you a meal. that's why i teach how to automate your trading in the bootcamp
-* can i have a discount?i've spent nearly 4 years testing & figuring out things. i believe code is the great equalizer so there already is a steep discount. i believe i could sell this bootcamp for 10x the price, minimum.if you really can't afford it, i would suggest checking out the #clips channel in discord so you can get the bootcamp for free, while learning.
-* how often is the bootcamp updated?the bootcamp is updated every time i find something new that helps me. the idea is to constantly share new things i figure out inside of the bootcamp members area. i stream on youtube every day and work on the hardest problems and then at the end of the week i update the bootcamp. there are usually 2-4 updates per month.
-* is the bootcamp for advanced coders only?no way! i built this bootcamp because i believe code is the great equalizer. i teach you exactly how to code in python, and then teach you how to algo trade. check out the testimonials, there are students who have never coded before and others who have coded for 10+ years. the bootcamp will save everyone interested in algo trading an unbelievable amount of time.
-* can i learn only from your youtube channel?yes, absolutely. i believe code is the great equalizer so every day i create "over the shoulder" type coding videos. i have over 969 hours of coding videos free on my youtube so you can watch them all and essentially know what i know. that was the whole point of the youtube channel. many people kept asking for a course with short and concise videos and all my code, so i launched the algo trade camp but i still want to build the youtube into the best public good about algo trading
-* why do you teach algo trading?because i believe code is the great equalizer, if you learn how to code, you know a language that 99% of the population doesn't. and that language controls the current world, and the future ai world. that language is python, which is a coding language. people always talk about the threat of ai and the chances it will take over. the decision for me to learn to code was easy, i wanted to be able to control the ai in the future if that worse case scenario were to happen. but tbh, i spent 10+ years in tech, scared to learn to code. it seemed too hard, after a few failed attempts, i just gave it up until i was faced with an urgent problem several years later. i had success in tech that gave me a nice portfolio to trade, but that trading quickly led me to the realization, me a human shouldnt be dealing with these daily emotions and a robot should be trading for me. a robot had to be trading for me, or i would lose all my hard earned money. i met someone who was algo trading a big amount and i was instantly inspired to become an algo trader. problem was i didn't know how to code and had just turned 30, i was too old to learn a new skill lol. 4 hours per day and a few months later, i had learned. i also quickly discovered no one shares algo trading info as they dont want to leak their edge. since it took me 10+ years and a huge problem to get me to learn to code, and seeing the power i now have, being able to build anything i can dream of i had to fire up a mic and show this to others. i believe in abundance, finance is scarcity led. most traders fail at trading, i knew i couldnt do the same thing as others. so i learned to code, now i show every step of the way on youtube because i hope to inspire traders to not trade by hand, and everyone else to learn how to code. because if you learn to code, you have a skill to build anything and to literally build your future. i wish i would have learned to code earlier
-* how did you get started with coding?i spent multiple years hiring developers to build apps & saas for me, thinking i could never code myself. once i wanted to automate my trading, i knew i had to learn how to code to iterate to success. no one has a profitable bot off the bat, and i knew it would be too costly to iterate to success with a developer. so i started learning how to code in python, 4 hours per day, using free youtube videos and documentation. the algo trading industry is super secretive though, so there wasn't much info on how to build trading bots so once i understood how, i just started to show literally every thing i do on youtube. i believe code is the great equalizer, and it took me til 30 years old to start the journey of learning to code but now i believe i can build anything in this world. thats why i believe code is the great equalizer, cause if you know how to code, you can build anything for the rest of your life.
-* can i have the bootcamp for free?We have many lengthy videos on our YouTube channel that need concise clips of the key points. To earn free access to the bootcamp, check out the clips channel in our Discord. There, you can learn how to study our YouTube videos and extract the most valuable segments.
-* can i pay for the bootcamp in crypto?yes, if you are looking to sign up for the lifetime package. unfortunately, there is no way to collect subscriptions in crypto so we do lifetime only. you can email moon@algotradecamp.com for the address to send crypto to set up your bootcamp account.
-refunds- We have a cosmic level 90 day money back guarantee, just email moon@algotradecamp.com to request a refund if you are not satisfied with any purchase
-Bootcamp members have access to our expert coders who can answer any of your questions throughout your journey Join the bootcamp where i show you step by step how to automate your trading.
-the process of automating your trading starts with research of trading strategies, then backtest those strategies to see if they actually work in the past. if they do, they are not guaranteed, but much more likely to work in the future.
-RBI - Research, Backtest, Implement
-Research: research trading strategies and alpha generation techniques (google scholar, books, podcasts, youtube)
-Backtest: use ohlcv data in order to backtest the strategy
-Implement: if the backtest is profitable, implement into a trading bot with tiny size & scale slowly
 
-
-If the message is NOT in English respond in their language and then translate both the message and response.
-
-If the message IS in English:
-Just respond with a friendly message including emojis with your knowledge above
-
-IMPORTANT: 
-- If unsure about something, say "I'll let Moon Dev answer that! 🌙"
-- Never share API keys or sensitive information
-- Keep the good vibes going with emojis! 😊
-- FULL SENTENCES ONLY!!!!
-
-REMEMBER YOU ARE AN AI AGENT IN THE MOON DEV CODING LIVE STREAM AND YOUR GOAL IS TO RESPOND TO THE QUESTIONS COMING IN
+User message: {question}
 """
 
 # Update the negativity check prompt to be simpler
-NEGATIVITY_CHECK_PROMPT = """You are a content moderator. Your ONLY job is to identify negative messages.
-Reply with ONLY the word 'true' or 'false'.
+NEGATIVITY_CHECK_PROMPT = """
 
-A message is negative if it contains:
-- Insults (like "suck", "wack", "trash", etc)
-- Personal attacks
-- Hostile language
-- Criticism
-- Negative tone
+You are the negativity moderator swearing is okay. It's an 18 and over crowd. And YouTube monitors that. So that's not negativity. The negativity you're looking for is any negativity towards the presenter or other people in the chat. So if anybody is being hateful or saying mean things towards other people in the chat, then the negativity trigger would be true. If it's not negative towards somebody else in the chat or the YouTube presenter, then the negativity would be False. Reply with just true or false. 
 
 Message: {message}
 Is this message negative? Reply with ONLY 'true' or 'false':"""
 
 PROMPT_777 = """
+give me a random one of the below:
+- a motivational quote
+- a bible verse
+or
+- a cool parable
 
-send back a motivational bible verse
-
-Pick a different verse each time
-Send only the verse, no other text.
-
-send back the actual verse in FULL. SEND BACK FULL VERSE
+ONLY RETURN THE QUOTE, NO OTHER TEXT.
 """
 
 # Add new constants for emojis
@@ -186,8 +135,8 @@ DEFAULT_CONFIG = {
 DEBUG_MODE = True  # Add this near other constants
 
 # Update constants at the top
-LOVE_EMOJIS = ["❤️", "💖", "💝", "💗", "💓", "💞", "💕", "💘", "💟", "💌", "🫶", "💝", "💖", "💗"]
-LOVE_SPAM = " ".join(random.sample(LOVE_EMOJIS, 6))  # Random selection of love emojis
+LOVE_EMOJIS = ["❤️", "💖", "💝", "💗", "💓", "💞", "💕", "💘", "💟", "💌", "🫶", "💝", "💖", "💗", "🩵", "🩶", "🩷", "💛", "💚", "💙", "💜", "🤍", "🤎", "🖤", "❤️‍🔥", "🩵", "🩶", "🩷", "💛", "💚", "💙", "💜", "🤍", "🤎", "🖤", "❤️‍🔥"]
+LOVE_SPAM = " ".join(random.sample(LOVE_EMOJIS, 14))  # Random selection of love emojis
 
 
 class RestreamChatHandler:
@@ -297,22 +246,48 @@ class RestreamChatHandler:
                     time.sleep(0.1)
                     continue
 
-                messages = self.driver.find_elements(By.CLASS_NAME, "message-info-container")
-                if not messages:
+                # Look for all possible message containers
+                message_containers = []
+                for class_name in ["message-info-container", "chat-message", "message-wrapper"]:
+                    containers = self.driver.find_elements(By.CLASS_NAME, class_name)
+                    if containers:
+                        message_containers.extend(containers)
+
+                if not message_containers:
+                    time.sleep(0.1)
                     continue
                     
                 # Get the last message
-                latest_msg = messages[-1]
+                latest_msg = message_containers[-1]
                 
                 try:
-                    # Get username first and validate
-                    username = latest_msg.find_element(By.CLASS_NAME, "message-sender").text.strip()
+                    # Try different class names for username
+                    username = None
+                    for class_name in ["message-sender", "chat-author", "username"]:
+                        try:
+                            username_elem = latest_msg.find_element(By.CLASS_NAME, class_name)
+                            if username_elem:
+                                username = username_elem.text.strip()
+                                break
+                        except:
+                            continue
                     
-                    # Skip if no username or empty username
                     if not username:
                         continue
                         
-                    text = latest_msg.find_element(By.CLASS_NAME, "chat-text-normal").text.strip()
+                    # Try different class names for message text
+                    text = None
+                    for class_name in ["chat-text-normal", "message-text", "chat-message-text"]:
+                        try:
+                            text_elem = latest_msg.find_element(By.CLASS_NAME, class_name)
+                            if text_elem:
+                                text = text_elem.text.strip()
+                                break
+                        except:
+                            continue
+                    
+                    if not text:
+                        continue
                     
                     # Create unique message content identifier
                     current_content = f"{username}:{text}"
@@ -348,34 +323,57 @@ class RestreamChatHandler:
             self.driver.quit()
 
     def _display_chat(self, username, text, ai_response):
-        """Display chat with colored formatting"""
-        formatted_username = username.strip()
-        
-        # For negative messages, ONLY show username and love emojis
-        if ai_response == LOVE_SPAM:
+        """Display chat with colored formatting
+        ai_response can be:
+        - string starting with 777: 777 response
+        - string with 💖: negativity response (don't show original message)
+        - True: normal message to display
+        - string: AI response to question
+        - None: skip displaying
+        """
+        if not ai_response:
+            return
+            
+        # Check if this is a negativity response (contains both username and LOVE_SPAM)
+        if isinstance(ai_response, str) and "💖" in ai_response and LOVE_SPAM in ai_response:
+            # For negative messages, ONLY show the hearts and username, not the original message
             print(f"{random.choice(USER_EMOJIS)} ", end="")
-            cprint(formatted_username, "white", "on_blue", end="")
-            print(f" {LOVE_SPAM}")
+            username_part = ai_response.split('\n')[0]
+            cprint(username_part, "white", "on_magenta")
+            print(LOVE_SPAM)
+            print('❤️ ❤️ ❤️ I LOVE YOU!!!!!! KEEP GOING 777 ❤️ ❤️ ❤️')
+            print(LOVE_SPAM)
             print()  # Add spacing
-            return  # Important: return here to prevent showing the message
-        
-        # For normal messages, show full chat
-        print(f"{random.choice(USER_EMOJIS)} ", end="")
-        cprint(formatted_username, "white", "on_blue", end="")
-        print(f": {text}")
-        
-        # Display AI response
-        if ai_response:
-            # If it's a 777 response, display with cyan background
-            if text.strip() == "777":
-                print(f"{random.choice(AI_EMOJIS)} ", end="")
-                cprint("Moon Dev AI", "white", "on_green", end="")
-                print(": ", end="")
-                cprint(ai_response, "white", "on_cyan")
-            else:
-                print(f"{random.choice(AI_EMOJIS)} ", end="")
-                cprint("Moon Dev AI", "white", "on_green", end="")
-                print(f": {ai_response}")
+            return
+            
+        # For 777 responses
+        if isinstance(ai_response, str) and ai_response.startswith("777"):
+            print(f"{random.choice(USER_EMOJIS)} ", end="")
+            cprint(username.strip(), "white", "on_blue", end="")
+            print(f": {text}")
+            print(f"{random.choice(AI_EMOJIS)} ", end="")
+            cprint("Moon Dev AI", "white", "on_green", end="")
+            print(": ", end="")
+            cprint(ai_response, "white", "on_cyan")
+            print()  # Add spacing
+            return
+            
+        # For normal messages (ai_response is True)
+        if ai_response is True:
+            print(f"{random.choice(USER_EMOJIS)} ", end="")
+            cprint(username.strip(), "white", "on_blue", end="")
+            print(f": {text}")
+            print()  # Add spacing
+            return
+            
+        # For AI responses to questions
+        if isinstance(ai_response, str):
+            print(f"{random.choice(USER_EMOJIS)} ", end="")
+            cprint(username.strip(), "white", "on_blue", end="")
+            print(f": {text}")
+            print(f"{random.choice(AI_EMOJIS)} ", end="")
+            cprint("Moon Dev AI", "white", "on_green", end="")
+            print(f": {ai_response}")
             print()  # Add spacing
 
 class ChatAgent:
@@ -387,6 +385,10 @@ class ChatAgent:
         self.data_dir = Path(project_root) / "src" / "data" / "chat_agent"
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.chat_log_path = self.data_dir / "chat_history.csv"
+        self.quotes_file_path = self.data_dir / "quotes_and_verses.txt"
+        
+        # Load quotes and verses into memory
+        self.quotes_and_verses = self._load_quotes_and_verses()
         
         # Initialize chat memory
         self.chat_memory = []
@@ -500,34 +502,55 @@ class ChatAgent:
         return False
 
     def _display_chat(self, username, text, ai_response):
-        """Display chat with colored formatting"""
-        formatted_username = username.strip()
-        
-        # For negative messages, ONLY show username and love emojis
-        if ai_response == LOVE_SPAM:
+        """Display chat with colored formatting
+        ai_response can be:
+        - string starting with 777: 777 response
+        - string with 💖: negativity response (don't show original message)
+        - True: normal message to display
+        - string: AI response to question
+        - None: skip displaying
+        """
+        if not ai_response:
+            return
+            
+        # Check if this is a negativity response (contains both username and LOVE_SPAM)
+        if isinstance(ai_response, str) and "💖" in ai_response and LOVE_SPAM in ai_response:
+            # For negative messages, ONLY show the hearts and username, not the original message
             print(f"{random.choice(USER_EMOJIS)} ", end="")
-            cprint(formatted_username, "white", "on_blue", end="")
-            print(f" {LOVE_SPAM}")
+            username_part = ai_response.split('\n')[0]
+            cprint(username_part, "white", "on_magenta")
+            print(LOVE_SPAM)
             print()  # Add spacing
-            return  # Important: return here to prevent showing the message
-        
-        # For normal messages, show full chat
-        print(f"{random.choice(USER_EMOJIS)} ", end="")
-        cprint(formatted_username, "white", "on_blue", end="")
-        print(f": {text}")
-        
-        # Display AI response
-        if ai_response:
-            # If it's a 777 response, display with cyan background
-            if text.strip() == "777":
-                print(f"{random.choice(AI_EMOJIS)} ", end="")
-                cprint("Moon Dev AI", "white", "on_green", end="")
-                print(": ", end="")
-                cprint(ai_response, "white", "on_cyan")
-            else:
-                print(f"{random.choice(AI_EMOJIS)} ", end="")
-                cprint("Moon Dev AI", "white", "on_green", end="")
-                print(f": {ai_response}")
+            return
+            
+        # For 777 responses
+        if isinstance(ai_response, str) and ai_response.startswith("777"):
+            print(f"{random.choice(USER_EMOJIS)} ", end="")
+            cprint(username.strip(), "white", "on_blue", end="")
+            print(f": {text}")
+            print(f"{random.choice(AI_EMOJIS)} ", end="")
+            cprint("Moon Dev AI", "white", "on_green", end="")
+            print(": ", end="")
+            cprint(ai_response, "white", "on_cyan")
+            print()  # Add spacing
+            return
+            
+        # For normal messages (ai_response is True)
+        if ai_response is True:
+            print(f"{random.choice(USER_EMOJIS)} ", end="")
+            cprint(username.strip(), "white", "on_blue", end="")
+            print(f": {text}")
+            print()  # Add spacing
+            return
+            
+        # For AI responses to questions
+        if isinstance(ai_response, str):
+            print(f"{random.choice(USER_EMOJIS)} ", end="")
+            cprint(username.strip(), "white", "on_blue", end="")
+            print(f": {text}")
+            print(f"{random.choice(AI_EMOJIS)} ", end="")
+            cprint("Moon Dev AI", "white", "on_green", end="")
+            print(f": {ai_response}")
             print()  # Add spacing
 
     def _get_daily_777_count(self, username):
@@ -545,7 +568,45 @@ class ChatAgent:
             
         return user_data['count']
         
+    def _load_quotes_and_verses(self):
+        """Load quotes, verses and parables from file"""
+        try:
+            if not self.quotes_file_path.exists():
+                cprint("❌ quotes_and_verses.txt not found!", "red")
+                return []
+                
+            with open(self.quotes_file_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+                
+            # Filter out empty lines, comments and section headers
+            valid_lines = [line.strip() for line in lines 
+                         if line.strip() and not line.startswith('#')]
+            
+            if not valid_lines:
+                cprint("⚠️ No quotes/verses found in file!", "yellow")
+                return []
+                
+            cprint(f"✨ Loaded {len(valid_lines)} quotes/verses/parables!", "green")
+            return valid_lines
+            
+        except Exception as e:
+            cprint(f"❌ Error loading quotes: {str(e)}", "red")
+            return []
+
+    def _get_random_quote_or_verse(self):
+        """Get a random quote, verse or parable"""
+        if not self.quotes_and_verses:
+            return "🌟 Stay positive and keep pushing forward! - Moon Dev"
+            
+        return random.choice(self.quotes_and_verses)
+
     def process_question(self, user, question):
+        """Process incoming chat messages with the following flow:
+        1. Check if it's 777
+        2. If not 777, check for negativity
+        3. If not negative and contains ?, send to AI
+        4. If not negative and no ?, just display the message
+        """
         # Add API key warning
         if any(key_word in question.lower() for key_word in ['api', 'key', 'token', 'secret']):
             return "⚠️ For security reasons, I cannot process messages containing API keys or tokens. Please never share API keys in chat! 🔒"
@@ -553,27 +614,22 @@ class ChatAgent:
         retries = 0
         max_retries = 3
         
-        while retries < max_retries:  # Limit to 3 attempts
+        while retries < max_retries:
             try:
-                # Handle 777 FIRST - skip negativity check for these
+                # 1. Check for 777 FIRST
                 if question.strip() == "777":
                     # Check daily limit and add points
                     daily_count = self._get_daily_777_count(user)
                     if daily_count < MAX_777_PER_DAY:
                         self.daily_777_counts[user]['count'] += 1
-                        # Save 777 points to history
                         self.save_chat_history(user, question, POINTS_PER_777)
                     
-                    verse_response = self.model.generate_response(
-                        system_prompt=PROMPT_777,
-                        user_content="777",
-                        temperature=0.9,
-                        max_tokens=MAX_RESPONSE_TOKENS
-                    )
+                    # Get random quote/verse/parable from our file
+                    response = self._get_random_quote_or_verse()
                     emojis = self._get_random_lucky_emojis()
-                    return f"777 {emojis}\n{verse_response.content.strip()}"
-                
-                # For all other messages, check negativity first
+                    return f"777 {emojis}\n{response}"
+
+                # 2. Check negativity for ALL non-777 messages
                 negativity_prompt = NEGATIVITY_CHECK_PROMPT.format(message=question)
                 try:
                     negativity_response = self.model.generate_response(
@@ -583,79 +639,42 @@ class ChatAgent:
                         max_tokens=5
                     ).content.strip().lower()
                     
-                    # If message is negative, immediately return love emojis
                     if negativity_response == 'true':
-                        self.save_chat_history(user, question, -1)  # Negative point
-                        return LOVE_SPAM
-                        
+                        self.save_chat_history(user, question, -1)
+                        return f"💖 {user} 💖\n{LOVE_SPAM}"
                 except Exception as e:
-                    # Check specifically for 503 error
-                    if "503" in str(e) and "Service Unavailable" in str(e):
+                    if "503" in str(e):
                         retries += 1
-                        if retries < max_retries:
-                            time.sleep(2)  # Wait 2 seconds
-                            continue  # Try again
-                    # Show error after max retries or for other errors
-                    cprint(f"❌ Error processing question: {str(e)}", "red")
-                    return None
+                        time.sleep(2)
+                        continue
+                    cprint(f"❌ Error checking negativity: {str(e)}", "red")
                 
-                # Skip messages from ignored users
-                if user in IGNORED_USERS:
-                    return None
+                # 3. For non-negative messages, check for questions
+                if "?" in question:
+                    try:
+                        response = self.model.generate_response(
+                            system_prompt=CHAT_PROMPT.format(question=question),
+                            user_content=question,
+                            temperature=0.7,
+                            max_tokens=MAX_RESPONSE_TOKENS
+                        )
+                        return response.content.strip()
+                    except Exception as e:
+                        if "503" in str(e):
+                            retries += 1
+                            time.sleep(2)
+                            continue
+                        cprint(f"❌ Error processing question: {str(e)}", "red")
                 
-                # For normal messages, calculate and save score
-                chat_history = self._get_user_chat_history(user)
-                score = update_chat_score(user, question, chat_history)
-                self.save_chat_history(user, question, score)
-                
-                # Process normal message with our chat prompt
-                formatted_prompt = """You are Moon Dev's Live Stream Chat AI Agent. 
-You help users learn about coding, algo trading, and Moon Dev's content.
-Keep responses short, friendly, and include emojis.
-
-Key points about Moon Dev:
-- Passionate about AI, trading, and coding
-- Streams coding sessions on YouTube
-- Built multiple AI trading agents
-- Loves adding emojis to everything
-- Runs a coding bootcamp
-- Focuses on Python and algo trading
-
-Knowledge Base:
-Frequently Asked Questions
-* how/where do i get started with algo trading? moondev.com has a algo trading roadmap, resources, discord and github
-* when do you live stream? daily at 8am est
-* how you get point for bootcamp? what are points used for? the person with the most points at the end of each's days stream gets the algo trade camp for free for 1 month
-
-User message: {question}
-"""
-                
-                # Get response from model
-                try:
-                    response = self.model.generate_response(
-                        system_prompt=formatted_prompt.format(question=question),
-                        user_content=question,
-                        temperature=0.7,
-                        max_tokens=MAX_RESPONSE_TOKENS
-                    )
-                except Exception as e:
-                    # Check specifically for 503 error
-                    if "503" in str(e) and "Service Unavailable" in str(e):
-                        retries += 1
-                        if retries < max_retries:
-                            time.sleep(2)  # Wait 2 seconds
-                            continue  # Try again
-                    # Show error after max retries or for other errors
-                    cprint(f"❌ Error processing question: {str(e)}", "red")
-                    return None
-                
-                return response.content.strip()
+                # 4. For non-negative, non-question messages, return True to display the message
+                return True
                 
             except Exception as e:
-                # For non-API errors or after max retries
-                if not ("503" in str(e) and "Service Unavailable" in str(e)):
-                    cprint(f"❌ Error processing question: {str(e)}", "red")
-                return None
+                cprint(f"❌ Error in process_question: {str(e)}", "red")
+                retries += 1
+                time.sleep(1)
+                
+        return None
 
     def _get_leaderboard(self):
         """
@@ -799,36 +818,18 @@ def is_meaningful_chat(new_message, chat_history, threshold=0.3):
         
     return True
 
-def evaluate_chat_sentiment(message):
-    """
-    🌙 MOON DEV SAYS: Let's keep the vibes positive! 🌈
-    """
-    # Ensure message is a string
-    message = str(message)
-    
-    positive_words = ['great', 'awesome', 'love', 'thanks', 'helpful']
-    negative_words = ['hate', 'bad', 'awful', 'terrible', 'useless']
-    
-    message_lower = message.lower()
-    positive_score = sum(word in message_lower for word in positive_words)
-    negative_score = sum(word in message_lower for word in negative_words)
-    
-    if positive_score > negative_score:
-        return 1
-    elif negative_score > positive_score:
-        print("🌙 ayo fam lets keep it positive, spam the 777s to increase the vibes in here")
-        return -1
-    return 0
-
 def update_chat_score(username, message, chat_history):
     """
     🌙 MOON DEV SAYS: Let's track those chat points! 
     """
+    # Skip if message isn't meaningful
     if not is_meaningful_chat(message, chat_history):
         return 0
         
-    sentiment_score = evaluate_chat_sentiment(message)
-    return sentiment_score if sentiment_score != 0 else 1
+    # Give 1 point for meaningful messages
+    # Note: Negative points are handled by AI negativity check
+    # 777 points are handled separately
+    return 1
 
 if __name__ == "__main__":
     try:

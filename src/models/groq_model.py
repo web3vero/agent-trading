@@ -6,6 +6,7 @@ Built with love by Moon Dev 🚀
 from groq import Groq
 from termcolor import cprint
 from .base_model import BaseModel, ModelResponse
+import time
 
 class GroqModel(BaseModel):
     """Implementation for Groq's models"""
@@ -178,36 +179,35 @@ class GroqModel(BaseModel):
             self.client = None
             raise
     
-    def generate_response(self, 
-        system_prompt: str,
-        user_content: str,
-        temperature: float = 0.7,
-        max_tokens: int = 1024,
-        **kwargs
-    ) -> ModelResponse:
-        """Generate a response using Groq"""
+    def generate_response(self, system_prompt, user_content, temperature=0.7, max_tokens=None):
+        """Generate response with no caching"""
         try:
+            # Force unique request every time
+            timestamp = int(time.time() * 1000)  # Millisecond precision
+            
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_content}
+                    {"role": "user", "content": f"{user_content}_{timestamp}"}  # Make each request unique
                 ],
                 temperature=temperature,
-                max_tokens=max_tokens,
-                stream=False
+                max_tokens=max_tokens if max_tokens else self.max_tokens,
+                stream=False  # Disable streaming to prevent caching
             )
             
             return ModelResponse(
-                content=response.choices[0].message.content.strip(),
+                content=response.choices[0].message.content,
                 raw_response=response,
                 model_name=self.model_name,
-                usage=response.usage.model_dump() if hasattr(response, 'usage') else None
+                usage=response.usage
             )
             
         except Exception as e:
-            cprint(f"❌ Groq generation error: {str(e)}", "red")
-            raise
+            if "503" in str(e):
+                raise e
+            cprint(f"❌ Groq error: {str(e)}", "red")
+            return None
     
     def is_available(self) -> bool:
         """Check if Groq is available"""
